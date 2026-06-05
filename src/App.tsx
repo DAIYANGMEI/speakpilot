@@ -170,6 +170,16 @@ type SpeechMetrics = {
   endedAt: number | null
 }
 
+type PracticeHistoryItem = {
+  id: string
+  time: string
+  modeTitle: string
+  score: number
+  pronunciationScore: number
+  provider: 'model' | 'fallback'
+  focusArea: string
+}
+
 declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionConstructor
@@ -287,6 +297,13 @@ function getNowMs() {
   return Math.round(performance.timeOrigin + performance.now())
 }
 
+function formatHistoryTime(timestampMs: number) {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestampMs))
+}
+
 function getSweetVoiceScore(voice: SpeechSynthesisVoice) {
   const name = voice.name.toLowerCase()
   const lang = voice.lang.toLowerCase()
@@ -397,6 +414,7 @@ function App() {
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null)
   const [draft, setDraft] = useState('')
   const [feedback, setFeedback] = useState<CoachFeedback>(initialFeedback)
+  const [practiceHistory, setPracticeHistory] = useState<PracticeHistoryItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
@@ -545,6 +563,20 @@ function App() {
       }
 
       setFeedback(enrichedFeedback)
+      setPracticeHistory((currentHistory) =>
+        [
+          {
+            id: crypto.randomUUID(),
+            time: formatHistoryTime(getNowMs()),
+            modeTitle: currentMode.id === 'scenario' ? currentScenario.title : currentMode.title,
+            score: enrichedFeedback.score,
+            pronunciationScore: enrichedFeedback.pronunciation.score,
+            provider: enrichedFeedback.provider.source,
+            focusArea: enrichedFeedback.focusArea,
+          },
+          ...currentHistory,
+        ].slice(0, 5),
+      )
       setMessages((currentMessages) => [...currentMessages, coachMessage])
       setRuntime({
         configured: enrichedFeedback.provider.source === 'model',
@@ -931,6 +963,39 @@ function App() {
               <span>Words</span>
               <strong>{feedback.metrics.wordCount}</strong>
             </article>
+          </section>
+
+          <section className="history-box">
+            <div className="history-heading">
+              <h3>Session History</h3>
+              <button
+                disabled={practiceHistory.length === 0}
+                onClick={() => setPracticeHistory([])}
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="history-list">
+              {practiceHistory.length === 0 ? (
+                <p>No practice turns yet.</p>
+              ) : (
+                practiceHistory.map((item) => (
+                  <article key={item.id}>
+                    <div>
+                      <strong>{item.modeTitle}</strong>
+                      <span>{item.time}</span>
+                    </div>
+                    <p>{item.focusArea}</p>
+                    <footer>
+                      <span>Score {item.score}</span>
+                      <span>Pron. {item.pronunciationScore}</span>
+                      <span>{item.provider === 'model' ? 'Model' : 'Fallback'}</span>
+                    </footer>
+                  </article>
+                ))
+              )}
+            </div>
           </section>
 
           <div className="feedback-block focus">

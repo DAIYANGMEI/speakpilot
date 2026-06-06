@@ -180,6 +180,11 @@ type PracticeHistoryItem = {
   focusArea: string
 }
 
+type ReadinessItem = {
+  label: string
+  complete: boolean
+}
+
 declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionConstructor
@@ -302,6 +307,52 @@ function formatHistoryTime(timestampMs: number) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(timestampMs))
+}
+
+function countEnglishWords(text: string) {
+  return text.match(/[a-z']+/gi)?.length ?? 0
+}
+
+function getTargetWordCount(level: LearnerLevel, mode: PracticeMode) {
+  if (mode === 'grammar' || mode === 'vocabulary') {
+    return 8
+  }
+
+  const targets: Record<LearnerLevel, number> = {
+    A1: 6,
+    A2: 8,
+    B1: 12,
+    B2: 16,
+    C1: 18,
+  }
+
+  return targets[level]
+}
+
+function createReadinessItems(text: string, mode: PracticeMode, targetWords: number): ReadinessItem[] {
+  const trimmedText = text.trim()
+  const wordCount = countEnglishWords(trimmedText)
+  const hasSentenceEnding = /[.!?]$/.test(trimmedText)
+  const hasConnector = /\b(because|also|and|but|so|for example|then)\b/i.test(trimmedText)
+  const hasQuestion = trimmedText.includes('?')
+
+  return [
+    {
+      label: `${wordCount}/${targetWords} words`,
+      complete: wordCount >= targetWords,
+    },
+    {
+      label: mode === 'grammar' ? 'Clear sentence' : 'Full sentence',
+      complete: wordCount >= Math.min(targetWords, 8) && hasSentenceEnding,
+    },
+    {
+      label: mode === 'plan' || mode === 'vocabulary' || mode === 'grammar' ? 'Useful detail' : 'Follow-up or reason',
+      complete:
+        mode === 'scenario' || mode === 'freeTalk'
+          ? hasQuestion || hasConnector
+          : wordCount >= targetWords && hasConnector,
+    },
+  ]
 }
 
 function getSweetVoiceScore(voice: SpeechSynthesisVoice) {
@@ -448,6 +499,11 @@ function App() {
   const selectedCoachVoice = useMemo(
     () => pickCoachVoice(availableVoices, selectedVoiceURI),
     [availableVoices, selectedVoiceURI],
+  )
+  const draftTargetWords = getTargetWordCount(targetLevel, currentMode.id)
+  const draftReadinessItems = createReadinessItems(draft, currentMode.id, draftTargetWords)
+  const draftReadinessScore = Math.round(
+    (draftReadinessItems.filter((item) => item.complete).length / draftReadinessItems.length) * 100,
   )
 
   useEffect(() => {
@@ -853,6 +909,23 @@ function App() {
               rows={4}
               value={draft}
             />
+            <div className="draft-readiness" aria-label="answer readiness">
+              <div className="readiness-heading">
+                <span>Answer check</span>
+                <strong>{draftReadinessScore}%</strong>
+              </div>
+              <div className="readiness-meter" aria-hidden="true">
+                <span style={{ width: `${draftReadinessScore}%` }} />
+              </div>
+              <ul>
+                {draftReadinessItems.map((item) => (
+                  <li className={item.complete ? 'complete' : ''} key={item.label}>
+                    <CheckCircle2 size={14} />
+                    <span>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
             <div className="composer-actions">
               <button
                 className={`voice-button ${isListening ? 'recording' : ''}`}

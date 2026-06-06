@@ -517,6 +517,72 @@ textarea:focus {
   padding: 10px;
 }
 
+.voice-flow {
+  align-items: center;
+  background: rgba(239, 246, 255, 0.72);
+  border: 1px solid rgba(10, 132, 255, 0.18);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 10px 12px;
+}
+
+.voice-flow div {
+  display: grid;
+  gap: 3px;
+}
+
+.voice-flow span,
+.voice-flow small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.voice-flow span {
+  text-transform: uppercase;
+}
+
+.voice-flow strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.voice-flow small {
+  line-height: 1.35;
+  text-align: right;
+}
+
+.voice-flow.listening {
+  background: rgba(255, 241, 240, 0.82);
+  border-color: rgba(255, 69, 58, 0.24);
+}
+
+.voice-flow.listening strong {
+  color: #c92a2a;
+}
+
+.voice-flow.processing {
+  background: rgba(255, 248, 225, 0.82);
+  border-color: rgba(245, 159, 0, 0.26);
+}
+
+.voice-flow.processing strong {
+  color: #8a5a00;
+}
+
+.voice-flow.speaking {
+  background: rgba(232, 247, 240, 0.86);
+  border-color: rgba(18, 184, 134, 0.26);
+}
+
+.voice-flow.speaking strong {
+  color: #087f5b;
+}
+
 .readiness-heading {
   align-items: center;
   display: flex;
@@ -596,6 +662,7 @@ textarea:focus {
 
 .voice-button,
 .audio-button,
+.flow-toggle,
 .voice-select,
 .primary-button {
   align-items: center;
@@ -649,6 +716,18 @@ textarea:focus {
   border-color: var(--line);
   color: var(--muted);
   cursor: not-allowed;
+}
+
+.flow-toggle {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.flow-toggle.active {
+  background: rgba(239, 246, 255, 0.9);
+  border-color: rgba(10, 132, 255, 0.28);
+  color: var(--accent-strong);
 }
 
 .audio-button {
@@ -1137,9 +1216,19 @@ textarea:focus {
 
   .voice-button,
   .audio-button,
+  .flow-toggle,
   .voice-select,
   .primary-button {
     max-width: none;
     width: 100%;
+  }
+
+  .voice-flow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .voice-flow small {
+    text-align: left;
   }
 }

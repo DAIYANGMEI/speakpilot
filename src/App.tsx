@@ -556,6 +556,7 @@ function App() {
     Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
   )
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const messageListRef = useRef<HTMLDivElement | null>(null)
   const latestTranscriptRef = useRef('')
   const shouldSubmitVoiceRef = useRef(false)
   const autoSubmitTimerRef = useRef<number | null>(null)
@@ -654,6 +655,20 @@ function App() {
       window.speechSynthesis?.cancel()
     }
   }, [])
+
+  useEffect(() => {
+    const messageList = messageListRef.current
+
+    if (!messageList) {
+      return
+    }
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    messageList.scrollTo({
+      top: messageList.scrollHeight,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
+  }, [isSubmitting, messages.length])
 
   const canSubmit = draft.trim().length > 0 && !isSubmitting
   const statusLabel =
@@ -1077,7 +1092,7 @@ function App() {
             </button>
           </div>
 
-          <div className="message-list" aria-live="polite">
+          <div className="message-list" ref={messageListRef} aria-live="polite">
             {messages.map((message) => (
               <article className={`message ${message.role}`} key={message.id}>
                 <span>{message.role === 'coach' ? 'Coach' : 'You'}</span>

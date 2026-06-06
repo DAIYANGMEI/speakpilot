@@ -25,6 +25,7 @@ import './App.css'
 
 type ApiStatus = 'checking' | 'ready' | 'error'
 type CopyStatus = 'idle' | 'copied' | 'error'
+type VoiceFlowStatus = 'idle' | 'listening' | 'processing' | 'speaking'
 type PracticeMode = 'scenario' | 'freeTalk' | 'grammar' | 'plan' | 'vocabulary'
 type LearnerLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
 
@@ -142,6 +143,7 @@ type SpeechRecognitionAlternativeLike = {
 
 type SpeechRecognitionResultLike = {
   [index: number]: SpeechRecognitionAlternativeLike
+  isFinal?: boolean
 }
 
 type SpeechRecognitionResultEventLike = Event & {
@@ -156,6 +158,7 @@ type SpeechRecognitionLike = {
   continuous: boolean
   interimResults: boolean
   lang: string
+  maxAlternatives?: number
   onend: (() => void) | null
   onerror: (() => void) | null
   onresult: ((event: SpeechRecognitionResultEventLike) => void) | null
@@ -299,6 +302,25 @@ const preferredVoiceNames = [
   'google us english',
   'google uk english female',
 ]
+
+const voiceFlowCopy: Record<VoiceFlowStatus, { label: string; hint: string }> = {
+  idle: {
+    label: 'Ready',
+    hint: 'Press Speak to answer by voice.',
+  },
+  listening: {
+    label: 'Listening',
+    hint: 'Live transcript is updating.',
+  },
+  processing: {
+    label: 'Sending',
+    hint: 'Coach reply is being prepared.',
+  },
+  speaking: {
+    label: 'Speaking',
+    hint: 'Coach voice is playing.',
+  },
+}
 
 function getNowMs() {
   return Math.round(performance.timeOrigin + performance.now())
@@ -517,6 +539,8 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
+  const [autoSubmitVoice, setAutoSubmitVoice] = useState(true)
+  const [voiceFlowStatus, setVoiceFlowStatus] = useState<VoiceFlowStatus>('idle')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>(() =>
     'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [],
@@ -532,6 +556,12 @@ function App() {
     Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
   )
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const latestTranscriptRef = useRef('')
+  const shouldSubmitVoiceRef = useRef(false)
+  const autoSubmitTimerRef = useRef<number | null>(null)
+  const speechMetricsRef = useRef<SpeechMetrics>(speechMetrics)
+  const isSubmittingRef = useRef(false)
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
   const currentScenario = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0],
@@ -560,6 +590,7 @@ function App() {
   )
   const currentSessionTitle = currentMode.id === 'scenario' ? currentScenario.title : currentMode.title
   const canCopySummary = feedback.score > 0 && copyStatus !== 'copied'
+  const voiceFlowState = voiceFlowCopy[voiceFlowStatus]
 
   useEffect(() => {
     const controller = new AbortController()
@@ -606,6 +637,24 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    speechMetricsRef.current = speechMetrics
+  }, [speechMetrics])
+
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting
+  }, [isSubmitting])
+
+  useEffect(() => {
+    return () => {
+      if (autoSubmitTimerRef.current !== null) {
+        window.clearTimeout(autoSubmitTimerRef.current)
+        autoSubmitTimerRef.current = null
+      }
+      window.speechSynthesis?.cancel()
+    }
+  }, [])
+
   const canSubmit = draft.trim().length > 0 && !isSubmitting
   const statusLabel =
     apiStatus === 'ready'
@@ -616,13 +665,29 @@ function App() {
         ? 'Checking'
         : 'API Error'
 
-  async function submitAnswer() {
-    const learnerText = draft.trim()
+  function clearAutoSubmitTimer() {
+    if (autoSubmitTimerRef.current !== null) {
+      window.clearTimeout(autoSubmitTimerRef.current)
+      autoSubmitTimerRef.current = null
+    }
+  }
 
-    if (!learnerText) {
+  function cancelCoachVoice(nextStatus: VoiceFlowStatus = 'idle') {
+    window.speechSynthesis?.cancel()
+    utteranceRef.current = null
+    setVoiceFlowStatus(nextStatus)
+  }
+
+  async function submitAnswer(answerOverride?: string, speechOverride?: SpeechMetrics) {
+    const learnerText = (answerOverride ?? draft).trim()
+
+    if (!learnerText || isSubmittingRef.current) {
       return
     }
 
+    clearAutoSubmitTimer()
+    isSubmittingRef.current = true
+    setVoiceFlowStatus('processing')
     const learnerMessage: Message = {
       id: crypto.randomUUID(),
       role: 'learner',
@@ -631,6 +696,7 @@ function App() {
 
     setMessages((currentMessages) => [...currentMessages, learnerMessage])
     setDraft('')
+    latestTranscriptRef.current = ''
     setIsSubmitting(true)
 
     try {
@@ -647,7 +713,7 @@ function App() {
           learnerText,
           targetLevel,
           goal,
-          speech: speechMetrics,
+          speech: speechOverride ?? speechMetrics,
           history: [...messages, learnerMessage].slice(-10).map(({ role, text }) => ({
             role,
             text,
@@ -698,9 +764,12 @@ function App() {
       })
       if (autoSpeak) {
         speakCoachReply(enrichedFeedback.coachReply)
+      } else {
+        setVoiceFlowStatus('idle')
       }
     } catch {
       setApiStatus('error')
+      setVoiceFlowStatus('idle')
       setMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -710,6 +779,7 @@ function App() {
         },
       ])
     } finally {
+      isSubmittingRef.current = false
       setIsSubmitting(false)
     }
   }
@@ -728,51 +798,79 @@ function App() {
 
     const recognition = new Recognition()
     const startedAt = getNowMs()
+    clearAutoSubmitTimer()
+    cancelCoachVoice('listening')
+    latestTranscriptRef.current = draft.trim()
+    shouldSubmitVoiceRef.current = autoSubmitVoice
     recognition.lang = 'en-US'
     recognition.continuous = false
     recognition.interimResults = true
+    recognition.maxAlternatives = 1
     setSpeechMetrics({
       inputMethod: 'voice',
       recognitionConfidence: null,
       startedAt,
       endedAt: null,
     })
+    setVoiceFlowStatus('listening')
     recognition.onresult = (event) => {
       let transcript = ''
       let confidenceTotal = 0
       let confidenceCount = 0
-      const startIndex = event.resultIndex ?? 0
 
-      for (let index = startIndex; index < event.results.length; index += 1) {
+      for (let index = 0; index < event.results.length; index += 1) {
         const alternative = event.results[index][0]
-        transcript += alternative.transcript
+        transcript += `${alternative.transcript} `
         if (typeof alternative.confidence === 'number') {
           confidenceTotal += alternative.confidence
           confidenceCount += 1
         }
       }
 
-      setDraft(transcript.trim())
+      const nextTranscript = transcript.replace(/\s+/g, ' ').trim()
+      latestTranscriptRef.current = nextTranscript
+      setDraft(nextTranscript)
       setSpeechMetrics((currentMetrics) => ({
         ...currentMetrics,
         recognitionConfidence:
           confidenceCount > 0 ? confidenceTotal / confidenceCount : currentMetrics.recognitionConfidence,
       }))
     }
-    recognition.onerror = () => setIsListening(false)
-    recognition.onend = () => {
+    recognition.onerror = () => {
       setIsListening(false)
-      setSpeechMetrics((currentMetrics) => ({
-        ...currentMetrics,
-        endedAt: currentMetrics.endedAt ?? getNowMs(),
-      }))
+      setVoiceFlowStatus('idle')
+    }
+    recognition.onend = () => {
+      const endedAt = getNowMs()
+      const completedMetrics = {
+        ...speechMetricsRef.current,
+        inputMethod: 'voice',
+        startedAt,
+        endedAt: speechMetricsRef.current.endedAt ?? endedAt,
+      } satisfies SpeechMetrics
+
+      recognitionRef.current = null
+      setIsListening(false)
+      setSpeechMetrics(completedMetrics)
+
+      const finalTranscript = latestTranscriptRef.current.trim()
+      if (shouldSubmitVoiceRef.current && autoSubmitVoice && finalTranscript) {
+        setVoiceFlowStatus('processing')
+        autoSubmitTimerRef.current = window.setTimeout(() => {
+          void submitAnswer(finalTranscript, completedMetrics)
+        }, 350)
+        return
+      }
+
+      setVoiceFlowStatus('idle')
     }
     recognitionRef.current = recognition
     recognition.start()
     setIsListening(true)
   }
 
-  function stopListening() {
+  function stopListening(shouldSubmit = autoSubmitVoice) {
+    shouldSubmitVoiceRef.current = shouldSubmit
     recognitionRef.current?.stop()
     recognitionRef.current = null
     setIsListening(false)
@@ -780,20 +878,40 @@ function App() {
       ...currentMetrics,
       endedAt: currentMetrics.endedAt ?? getNowMs(),
     }))
+    if (!shouldSubmit) {
+      clearAutoSubmitTimer()
+      setVoiceFlowStatus('idle')
+    }
   }
 
   function speakCoachReply(text: string) {
     if (!('speechSynthesis' in window)) {
+      setVoiceFlowStatus('idle')
       return
     }
 
     window.speechSynthesis.cancel()
+    window.speechSynthesis.resume()
     const utterance = new SpeechSynthesisUtterance(text)
+    utteranceRef.current = utterance
     utterance.lang = 'en-US'
     utterance.voice = selectedCoachVoice ?? null
     utterance.rate = 0.88
     utterance.pitch = 1.16
     utterance.volume = 0.95
+    utterance.onstart = () => setVoiceFlowStatus('speaking')
+    utterance.onend = () => {
+      if (utteranceRef.current === utterance) {
+        utteranceRef.current = null
+        setVoiceFlowStatus('idle')
+      }
+    }
+    utterance.onerror = () => {
+      if (utteranceRef.current === utterance) {
+        utteranceRef.current = null
+      }
+      setVoiceFlowStatus('idle')
+    }
     window.speechSynthesis.speak(utterance)
   }
 
@@ -802,8 +920,9 @@ function App() {
     setFeedback(initialFeedback)
     setCopyStatus('idle')
     setDraft('')
-    window.speechSynthesis?.cancel()
-    stopListening()
+    latestTranscriptRef.current = ''
+    cancelCoachVoice()
+    stopListening(false)
   }
 
   function selectMode(mode: ModeConfig) {
@@ -812,8 +931,9 @@ function App() {
     setFeedback(initialFeedback)
     setCopyStatus('idle')
     setDraft('')
-    window.speechSynthesis?.cancel()
-    stopListening()
+    latestTranscriptRef.current = ''
+    cancelCoachVoice()
+    stopListening(false)
   }
 
   function selectScenario(scenario: Scenario) {
@@ -822,8 +942,9 @@ function App() {
     setFeedback(initialFeedback)
     setCopyStatus('idle')
     setDraft('')
-    window.speechSynthesis?.cancel()
-    stopListening()
+    latestTranscriptRef.current = ''
+    cancelCoachVoice()
+    stopListening(false)
   }
 
   async function copySessionSummary() {
@@ -842,7 +963,9 @@ function App() {
   function insertStarterPhrase(phrase: string) {
     setDraft((currentDraft) => {
       const trimmedDraft = currentDraft.trim()
-      return trimmedDraft ? `${trimmedDraft} ${phrase}` : phrase
+      const nextDraft = trimmedDraft ? `${trimmedDraft} ${phrase}` : phrase
+      latestTranscriptRef.current = nextDraft
+      return nextDraft
     })
     setSpeechMetrics({
       inputMethod: 'text',
@@ -987,6 +1110,7 @@ function App() {
               onChange={(event) => {
                 setDraft(event.target.value)
                 if (!isListening) {
+                  latestTranscriptRef.current = event.target.value
                   setSpeechMetrics({
                     inputMethod: 'text',
                     recognitionConfidence: null,
@@ -1004,6 +1128,13 @@ function App() {
               rows={4}
               value={draft}
             />
+            <div className={`voice-flow ${voiceFlowStatus}`} aria-live="polite">
+              <div>
+                <span>Voice flow</span>
+                <strong>{voiceFlowState.label}</strong>
+              </div>
+              <small>{voiceFlowState.hint}</small>
+            </div>
             <div className="draft-readiness" aria-label="answer readiness">
               <div className="readiness-heading">
                 <span>Answer check</span>
@@ -1030,14 +1161,23 @@ function App() {
                 type="button"
               >
                 {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-                <span>{isListening ? 'Listening' : 'Speak'}</span>
+                <span>{isListening ? (autoSubmitVoice ? 'Stop & send' : 'Stop') : 'Speak'}</span>
+              </button>
+              <button
+                className={`flow-toggle ${autoSubmitVoice ? 'active' : ''}`}
+                onClick={() => setAutoSubmitVoice((currentValue) => !currentValue)}
+                title="语音结束后自动提交"
+                type="button"
+              >
+                <ArrowRight size={18} />
+                <span>{autoSubmitVoice ? 'Auto-send' : 'Manual send'}</span>
               </button>
               <button
                 className={`audio-button ${autoSpeak ? 'active' : ''}`}
                 onClick={() => {
                   setAutoSpeak((currentValue) => !currentValue)
                   if (autoSpeak) {
-                    window.speechSynthesis?.cancel()
+                    cancelCoachVoice()
                   }
                 }}
                 title="自动朗读教练回复"
@@ -1067,7 +1207,12 @@ function App() {
                   </option>
                 ))}
               </select>
-              <button className="primary-button" disabled={!canSubmit} onClick={submitAnswer} type="button">
+              <button
+                className="primary-button"
+                disabled={!canSubmit}
+                onClick={() => void submitAnswer()}
+                type="button"
+              >
                 {isSubmitting ? <Loader2 className="spin-icon" size={18} /> : <Send size={18} />}
                 <span>Send</span>
               </button>

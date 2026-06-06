@@ -4,6 +4,7 @@ import {
   Brain,
   CalendarDays,
   CheckCircle2,
+  Copy,
   Gauge,
   Loader2,
   MessageSquareText,
@@ -23,6 +24,7 @@ import heroImage from './assets/hero.png'
 import './App.css'
 
 type ApiStatus = 'checking' | 'ready' | 'error'
+type CopyStatus = 'idle' | 'copied' | 'error'
 type PracticeMode = 'scenario' | 'freeTalk' | 'grammar' | 'plan' | 'vocabulary'
 type LearnerLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
 
@@ -355,6 +357,25 @@ function createReadinessItems(text: string, mode: PracticeMode, targetWords: num
   ]
 }
 
+function createSummaryText(feedback: CoachFeedback, modeTitle: string) {
+  return [
+    `SpeakPilot practice summary`,
+    `Mode: ${modeTitle}`,
+    `Score: ${feedback.score}`,
+    `Level: ${feedback.level}`,
+    `Focus: ${feedback.focusArea}`,
+    '',
+    `Better version:`,
+    feedback.suggestedRewrite,
+    '',
+    `Next step:`,
+    feedback.sessionSummary.nextStep,
+    '',
+    `Homework:`,
+    ...feedback.sessionSummary.homework.map((item, index) => `${index + 1}. ${item}`),
+  ].join('\n')
+}
+
 function getSweetVoiceScore(voice: SpeechSynthesisVoice) {
   const name = voice.name.toLowerCase()
   const lang = voice.lang.toLowerCase()
@@ -469,6 +490,7 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>(() =>
     'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [],
   )
@@ -505,6 +527,8 @@ function App() {
   const draftReadinessScore = Math.round(
     (draftReadinessItems.filter((item) => item.complete).length / draftReadinessItems.length) * 100,
   )
+  const currentSessionTitle = currentMode.id === 'scenario' ? currentScenario.title : currentMode.title
+  const canCopySummary = feedback.score > 0 && copyStatus !== 'copied'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -619,6 +643,7 @@ function App() {
       }
 
       setFeedback(enrichedFeedback)
+      setCopyStatus('idle')
       setPracticeHistory((currentHistory) =>
         [
           {
@@ -744,6 +769,7 @@ function App() {
   function resetPractice() {
     setMessages(createInitialMessages(currentMode, currentScenario))
     setFeedback(initialFeedback)
+    setCopyStatus('idle')
     setDraft('')
     window.speechSynthesis?.cancel()
     stopListening()
@@ -753,6 +779,7 @@ function App() {
     setSelectedMode(mode.id)
     setMessages(createInitialMessages(mode, currentScenario))
     setFeedback(initialFeedback)
+    setCopyStatus('idle')
     setDraft('')
     window.speechSynthesis?.cancel()
     stopListening()
@@ -762,9 +789,23 @@ function App() {
     setSelectedScenarioId(scenario.id)
     setMessages(createInitialMessages(currentMode, scenario))
     setFeedback(initialFeedback)
+    setCopyStatus('idle')
     setDraft('')
     window.speechSynthesis?.cancel()
     stopListening()
+  }
+
+  async function copySessionSummary() {
+    if (feedback.score <= 0) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(createSummaryText(feedback, currentSessionTitle))
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('error')
+    }
   }
 
   return (
@@ -1159,7 +1200,24 @@ function App() {
           </section>
 
           <section className="summary-box">
-            <h3>Class Summary</h3>
+            <div className="summary-heading">
+              <h3>Class Summary</h3>
+              <button
+                disabled={!canCopySummary}
+                onClick={copySessionSummary}
+                title="复制本轮总结"
+                type="button"
+              >
+                {copyStatus === 'copied' ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                <span>
+                  {copyStatus === 'copied'
+                    ? 'Copied'
+                    : copyStatus === 'error'
+                      ? 'Retry'
+                      : 'Copy'}
+                </span>
+              </button>
+            </div>
             <strong>{feedback.sessionSummary.headline}</strong>
             <p>{feedback.sessionSummary.nextStep}</p>
             <ul>

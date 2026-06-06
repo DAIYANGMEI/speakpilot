@@ -412,6 +412,44 @@ h3 {
   padding: 16px;
 }
 
+.starter-phrases {
+  display: grid;
+  gap: 8px;
+}
+
+.starter-phrases > span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.starter-phrases div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.starter-phrases button {
+  background: #f7f9ff;
+  border: 1px solid #c7d7f4;
+  border-radius: 999px;
+  color: #233876;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.starter-phrases button:hover,
+.starter-phrases button:focus {
+  border-color: #0f766e;
+  color: #0f766e;
+  outline: none;
+}
+
 textarea {
   background: #ffffff;
   border: 1px solid #cbd5e1;

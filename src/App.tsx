@@ -376,6 +376,33 @@ function createSummaryText(feedback: CoachFeedback, modeTitle: string) {
   ].join('\n')
 }
 
+function getStarterPhrases(mode: PracticeMode, scenarioId: string) {
+  if (mode === 'freeTalk') {
+    return ['Recently, I have been...', 'One reason is...', 'What do you think about...?']
+  }
+
+  if (mode === 'grammar') {
+    return ['What I mean is...', 'I want to say that...', 'A more natural way is...']
+  }
+
+  if (mode === 'plan') {
+    return ['My main goal is...', 'I can practice...', 'The hardest part is...']
+  }
+
+  if (mode === 'vocabulary') {
+    return ['I want to use this phrase...', 'For example, I can say...', 'This phrase is useful because...']
+  }
+
+  const scenarioPhrases: Record<string, string[]> = {
+    travel: ['Could you please check...', 'Would it be possible to...', 'I would like to confirm...'],
+    interview: ['One project I am proud of is...', 'The result was...', 'I learned that...'],
+    daily: ['I would like...', 'Could you recommend...', 'I would prefer...'],
+    presentation: ['The key problem is...', 'Our solution is...', 'The next step is...'],
+  }
+
+  return scenarioPhrases[scenarioId] ?? scenarioPhrases.daily
+}
+
 function getSweetVoiceScore(voice: SpeechSynthesisVoice) {
   const name = voice.name.toLowerCase()
   const lang = voice.lang.toLowerCase()
@@ -521,6 +548,10 @@ function App() {
   const selectedCoachVoice = useMemo(
     () => pickCoachVoice(availableVoices, selectedVoiceURI),
     [availableVoices, selectedVoiceURI],
+  )
+  const starterPhrases = useMemo(
+    () => getStarterPhrases(currentMode.id, currentScenario.id),
+    [currentMode.id, currentScenario.id],
   )
   const draftTargetWords = getTargetWordCount(targetLevel, currentMode.id)
   const draftReadinessItems = createReadinessItems(draft, currentMode.id, draftTargetWords)
@@ -808,6 +839,19 @@ function App() {
     }
   }
 
+  function insertStarterPhrase(phrase: string) {
+    setDraft((currentDraft) => {
+      const trimmedDraft = currentDraft.trim()
+      return trimmedDraft ? `${trimmedDraft} ${phrase}` : phrase
+    })
+    setSpeechMetrics({
+      inputMethod: 'text',
+      recognitionConfidence: null,
+      startedAt: null,
+      endedAt: null,
+    })
+  }
+
   return (
     <main className="app-shell">
       <section className="topbar" aria-label="app status">
@@ -929,6 +973,16 @@ function App() {
           </div>
 
           <div className="composer">
+            <div className="starter-phrases" aria-label="starter phrases">
+              <span>Starter phrases</span>
+              <div>
+                {starterPhrases.map((phrase) => (
+                  <button key={phrase} onClick={() => insertStarterPhrase(phrase)} type="button">
+                    {phrase}
+                  </button>
+                ))}
+              </div>
+            </div>
             <textarea
               onChange={(event) => {
                 setDraft(event.target.value)

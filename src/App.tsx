@@ -5,6 +5,8 @@ import {
   CalendarDays,
   CheckCircle2,
   Copy,
+  FileText,
+  Flag,
   Gauge,
   Loader2,
   MessageSquareText,
@@ -17,6 +19,7 @@ import {
   Volume2,
   VolumeX,
   Wand2,
+  X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -45,6 +48,7 @@ type Scenario = {
   skills: string[]
   sample: string
   image: string
+  avatarClass: string
   characterName: string
   characterRole: string
   personality: string
@@ -231,6 +235,7 @@ const scenarios: Scenario[] = [
     skills: ['polite request', 'travel vocabulary', 'follow-up question'],
     sample: 'Could you please help me check in? I have one suitcase and I would like an aisle seat.',
     image: sceneTravelImage,
+    avatarClass: 'emma-avatar',
     characterName: 'Emma',
     characterRole: 'Airport Ground Staff',
     personality: 'Polite, professional, patient, and slightly formal.',
@@ -284,6 +289,7 @@ const scenarios: Scenario[] = [
     skills: ['STAR answer', 'specific example', 'impact'],
     sample: 'In my last project, I built a dashboard that helped the team compare user feedback faster.',
     image: sceneInterviewImage,
+    avatarClass: 'james-avatar',
     characterName: 'James',
     characterRole: 'Hiring Manager',
     personality: 'Professional, friendly, structured, and curious.',
@@ -335,6 +341,7 @@ const scenarios: Scenario[] = [
     skills: ['ordering', 'preference', 'small talk'],
     sample: 'I would like a latte, please. Could you make it less sweet?',
     image: sceneCafeImage,
+    avatarClass: 'sophie-avatar',
     characterName: 'Sophie',
     characterRole: 'Barista',
     personality: 'Warm, relaxed, casual, and encouraging.',
@@ -388,6 +395,7 @@ const scenarios: Scenario[] = [
     skills: ['structure', 'clarity', 'confidence'],
     sample: 'Today I will introduce an English speaking coach that gives instant feedback after each answer.',
     image: scenePresentationImage,
+    avatarClass: 'olivia-avatar',
     characterName: 'Olivia',
     characterRole: 'Project Judge',
     personality: 'Rational, focused, professional, and slightly challenging.',
@@ -734,6 +742,12 @@ function App() {
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [autoSubmitVoice, setAutoSubmitVoice] = useState(true)
   const [voiceFlowStatus, setVoiceFlowStatus] = useState<VoiceFlowStatus>('idle')
+  const [roleScenarioId, setRoleScenarioId] = useState<string | null>(null)
+  const [roleMessages, setRoleMessages] = useState<Message[]>([])
+  const [roleDraft, setRoleDraft] = useState('')
+  const [roleFeedback, setRoleFeedback] = useState<CoachFeedback | null>(null)
+  const [isRoleSubmitting, setIsRoleSubmitting] = useState(false)
+  const [isRoleEnded, setIsRoleEnded] = useState(false)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>(() =>
     'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [],
@@ -750,6 +764,7 @@ function App() {
   )
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const messageListRef = useRef<HTMLDivElement | null>(null)
+  const roleMessageListRef = useRef<HTMLDivElement | null>(null)
   const latestTranscriptRef = useRef('')
   const shouldSubmitVoiceRef = useRef(false)
   const autoSubmitTimerRef = useRef<number | null>(null)
@@ -760,6 +775,10 @@ function App() {
   const currentScenario = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0],
     [selectedScenarioId],
+  )
+  const activeRoleScenario = useMemo(
+    () => scenarios.find((scenario) => scenario.id === roleScenarioId) ?? null,
+    [roleScenarioId],
   )
   const currentMode = useMemo(
     () => modes.find((mode) => mode.id === selectedMode) ?? modes[0],
@@ -785,6 +804,8 @@ function App() {
   const currentSessionTitle = currentMode.id === 'scenario' ? currentScenario.title : currentMode.title
   const canCopySummary = feedback.score > 0 && copyStatus !== 'copied'
   const voiceFlowState = voiceFlowCopy[voiceFlowStatus]
+  const canSubmitRole =
+    roleDraft.trim().length > 0 && !isRoleSubmitting && !isRoleEnded && activeRoleScenario !== null
 
   useEffect(() => {
     const controller = new AbortController()
@@ -862,6 +883,20 @@ function App() {
       behavior: prefersReducedMotion ? 'auto' : 'smooth',
     })
   }, [isSubmitting, messages.length])
+
+  useEffect(() => {
+    const messageList = roleMessageListRef.current
+
+    if (!messageList) {
+      return
+    }
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    messageList.scrollTo({
+      top: messageList.scrollHeight,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    })
+  }, [isRoleEnded, isRoleSubmitting, roleMessages.length])
 
   const canSubmit = draft.trim().length > 0 && !isSubmitting
   const statusLabel =
@@ -1155,6 +1190,136 @@ function App() {
     stopListening(false)
   }
 
+  function openRoleDialog(scenario: Scenario) {
+    setSelectedMode('scenario')
+    setSelectedScenarioId(scenario.id)
+    setMessages(createInitialMessages(modes[0], scenario))
+    setFeedback(initialFeedback)
+    setCopyStatus('idle')
+    setDraft('')
+    latestTranscriptRef.current = ''
+    cancelCoachVoice()
+    stopListening(false)
+
+    setRoleScenarioId(scenario.id)
+    setRoleMessages([createRoleOpeningMessage(scenario)])
+    setRoleDraft('')
+    setRoleFeedback(null)
+    setIsRoleEnded(false)
+    setIsRoleSubmitting(false)
+  }
+
+  function closeRoleDialog() {
+    setRoleScenarioId(null)
+    setRoleMessages([])
+    setRoleDraft('')
+    setRoleFeedback(null)
+    setIsRoleEnded(false)
+    setIsRoleSubmitting(false)
+  }
+
+  async function submitRoleAnswer() {
+    const scenario = activeRoleScenario
+    const learnerText = roleDraft.trim()
+
+    if (!scenario || !learnerText || isRoleSubmitting || isRoleEnded) {
+      return
+    }
+
+    const learnerMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'learner',
+      text: learnerText,
+    }
+    const requestHistory = [...roleMessages, learnerMessage].slice(-10)
+
+    setRoleMessages(requestHistory)
+    setRoleDraft('')
+    setIsRoleSubmitting(true)
+
+    try {
+      const requestStartedAt = getNowMs()
+      const response = await fetch('/api/coach/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: 'scenario',
+          scenarioId: scenario.id,
+          scenarioTitle: scenario.titleEn,
+          learnerText,
+          targetLevel,
+          goal: scenario.descriptionZh,
+          speech: {
+            inputMethod: 'text',
+            recognitionConfidence: null,
+            startedAt: null,
+            endedAt: null,
+          },
+          history: requestHistory.map(({ role, text }) => ({
+            role,
+            text,
+          })),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Role practice request failed')
+      }
+
+      const nextFeedback = (await response.json()) as CoachFeedback
+      const enrichedFeedback: CoachFeedback = {
+        ...nextFeedback,
+        metrics: {
+          ...nextFeedback.metrics,
+          responseLatencyMs: getNowMs() - requestStartedAt,
+        },
+      }
+      const coachMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'coach',
+        text: enrichedFeedback.coachReply,
+      }
+
+      setRoleFeedback(enrichedFeedback)
+      setRoleMessages((currentMessages) => [...currentMessages, coachMessage])
+      setRuntime({
+        configured: enrichedFeedback.provider.source === 'model',
+        model: enrichedFeedback.provider.model,
+        provider: enrichedFeedback.provider.label,
+        source: enrichedFeedback.provider.source,
+      })
+    } catch {
+      setRoleMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: crypto.randomUUID(),
+          role: 'coach',
+          text: `${scenario.characterName} cannot reach the coach service right now. Please try again in a moment.`,
+        },
+      ])
+    } finally {
+      setIsRoleSubmitting(false)
+    }
+  }
+
+  function finishRolePractice() {
+    if (!activeRoleScenario || isRoleEnded) {
+      return
+    }
+
+    setIsRoleEnded(true)
+    setRoleMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        id: crypto.randomUUID(),
+        role: 'coach',
+        text: `Thanks. Let's pause the ${activeRoleScenario.titleEn} practice here. Your feedback report is ready below.`,
+      },
+    ])
+  }
+
   async function copySessionSummary() {
     if (feedback.score <= 0) {
       return
@@ -1267,10 +1432,7 @@ function App() {
             <button
               className={`showcase-card ${scenario.id}`}
               key={`showcase-${scenario.id}`}
-              onClick={() => {
-                selectScenario(scenario)
-                document.querySelector('#coach')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }}
+              onClick={() => openRoleDialog(scenario)}
               type="button"
             >
               <img alt="" src={scenario.image} />
@@ -1279,9 +1441,12 @@ function App() {
                 <strong>{scenario.title}</strong>
                 <small>{scenario.titleEn}</small>
                 <p>{scenario.descriptionZh}</p>
-                <div className="scenario-coach-profile">
-                  <span>{scenario.characterName}</span>
-                  <small>{scenario.characterRole}</small>
+                <div className="showcase-character">
+                  <RoleAvatar scenario={scenario} size="small" />
+                  <span>
+                    {scenario.characterName}
+                    <small>{scenario.characterRole}</small>
+                  </span>
                 </div>
               </div>
             </button>
@@ -1772,12 +1937,221 @@ function App() {
       </section>
       </section>
 
+      {activeRoleScenario ? (
+        <section
+          aria-labelledby="role-dialog-title"
+          aria-modal="true"
+          className="role-dialog-layer"
+          role="dialog"
+        >
+          <div className="role-dialog">
+            <aside className="role-profile-panel">
+              <button className="role-close-button" onClick={closeRoleDialog} title="关闭角色陪练" type="button">
+                <X size={18} />
+              </button>
+              <div className="role-profile-hero">
+                <RoleAvatar scenario={activeRoleScenario} size="large" />
+                <div>
+                  <p>{activeRoleScenario.titleEn}</p>
+                  <h3>{activeRoleScenario.characterName}</h3>
+                  <span>{activeRoleScenario.characterRole}</span>
+                </div>
+              </div>
+              <div className="role-profile-tags">
+                <span>{activeRoleScenario.level}</span>
+                <span>{activeRoleScenario.voiceStyle}</span>
+              </div>
+              <p className="role-personality">{activeRoleScenario.personality}</p>
+              <section className="role-followups">
+                <h4>Natural follow-ups</h4>
+                <ul>
+                  {activeRoleScenario.exampleFollowUps.map((followUp) => (
+                    <li key={followUp}>{followUp}</li>
+                  ))}
+                </ul>
+              </section>
+            </aside>
+
+            <section className="role-chat-panel">
+              <header className="role-chat-header">
+                <div>
+                  <p>{activeRoleScenario.title}</p>
+                  <h2 id="role-dialog-title">
+                    {activeRoleScenario.characterName} - {activeRoleScenario.titleEn}
+                  </h2>
+                </div>
+                <span>{activeRoleScenario.level}</span>
+              </header>
+
+              <div className="role-message-list" ref={roleMessageListRef} aria-live="polite">
+                {roleMessages.map((message) => (
+                  <article className={`role-message ${message.role}`} key={message.id}>
+                    <span>{message.role === 'coach' ? activeRoleScenario.characterName : 'You'}</span>
+                    <p>{message.text}</p>
+                  </article>
+                ))}
+                {isRoleSubmitting ? (
+                  <article className="role-message coach loading">
+                    <span>{activeRoleScenario.characterName}</span>
+                    <p>
+                      <Loader2 className="spin-icon" size={16} />
+                      Thinking of the next question
+                    </p>
+                  </article>
+                ) : null}
+
+                {isRoleEnded ? (
+                  <section className="role-report">
+                    <div>
+                      <p>Practice Summary</p>
+                      <h3>{activeRoleScenario.titleEn}</h3>
+                    </div>
+                    <div className="role-score-grid" aria-label="practice score">
+                      <article>
+                        <span>Fluency</span>
+                        <strong>{formatTenPointScore(roleFeedback?.metrics.fluency, 7)}</strong>
+                      </article>
+                      <article>
+                        <span>Grammar</span>
+                        <strong>{formatTenPointScore(roleFeedback?.metrics.grammar, 6)}</strong>
+                      </article>
+                      <article>
+                        <span>Vocabulary</span>
+                        <strong>{formatTenPointScore(roleFeedback?.metrics.vocabulary, 7)}</strong>
+                      </article>
+                      <article>
+                        <span>Naturalness</span>
+                        <strong>{formatTenPointScore(roleFeedback?.metrics.interaction, 6)}</strong>
+                      </article>
+                      <article>
+                        <span>Confidence</span>
+                        <strong>{formatTenPointScore(roleFeedback?.score, 7)}</strong>
+                      </article>
+                    </div>
+                    <section>
+                      <h4>Main Problems</h4>
+                      <ol>
+                        {[
+                          roleFeedback ? `本轮重点：${roleFeedback.focusArea}` : '',
+                          ...activeRoleScenario.reportProblems,
+                        ]
+                          .filter(Boolean)
+                          .slice(0, 4)
+                          .map((problem) => (
+                            <li key={problem}>{problem}</li>
+                          ))}
+                      </ol>
+                    </section>
+                    <section>
+                      <h4>Better Expressions</h4>
+                      <ol>
+                        {activeRoleScenario.betterExpressions.map((expression) => (
+                          <li key={expression.lessNatural}>
+                            <span>"{expression.lessNatural}"</span>
+                            <strong>"{expression.natural}"</strong>
+                          </li>
+                        ))}
+                        {roleFeedback?.suggestedRewrite ? (
+                          <li>
+                            <span>本轮可优化表达</span>
+                            <strong>{roleFeedback.suggestedRewrite}</strong>
+                          </li>
+                        ) : null}
+                      </ol>
+                    </section>
+                    <section>
+                      <h4>Useful Sentences</h4>
+                      <ol>
+                        {activeRoleScenario.usefulSentences.map((sentence) => (
+                          <li key={sentence}>{sentence}</li>
+                        ))}
+                      </ol>
+                    </section>
+                  </section>
+                ) : null}
+              </div>
+
+              <form
+                className="role-composer"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void submitRoleAnswer()
+                }}
+              >
+                <textarea
+                  disabled={isRoleEnded}
+                  onChange={(event) => setRoleDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                      event.preventDefault()
+                      void submitRoleAnswer()
+                    }
+                  }}
+                  placeholder={isRoleEnded ? 'Practice ended. Start a new scene to continue.' : activeRoleScenario.sample}
+                  rows={3}
+                  value={roleDraft}
+                />
+                <div className="role-actions">
+                  <button className="role-send-button" disabled={!canSubmitRole} type="submit">
+                    {isRoleSubmitting ? <Loader2 className="spin-icon" size={17} /> : <Send size={17} />}
+                    <span>Send</span>
+                  </button>
+                  <button
+                    className="role-secondary-button"
+                    disabled={isRoleEnded}
+                    onClick={finishRolePractice}
+                    type="button"
+                  >
+                    <Flag size={17} />
+                    <span>End practice</span>
+                  </button>
+                  <button className="role-secondary-button" onClick={finishRolePractice} type="button">
+                    <FileText size={17} />
+                    <span>View feedback</span>
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </section>
+      ) : null}
+
       <footer className="product-footer product-page">
         <span>SpeakPilot</span>
         <a href="#product">Back to top</a>
       </footer>
     </main>
   )
+}
+
+function RoleAvatar({ scenario, size }: { scenario: Scenario; size: 'small' | 'large' }) {
+  return (
+    <div className={`role-avatar ${scenario.avatarClass} ${size}`} aria-hidden="true">
+      <span className="avatar-hair" />
+      <span className="avatar-face">
+        <span className="avatar-eye left" />
+        <span className="avatar-eye right" />
+        <span className="avatar-mouth" />
+      </span>
+      <span className="avatar-neck" />
+      <span className="avatar-outfit" />
+      <span className="avatar-badge" />
+    </div>
+  )
+}
+
+function formatTenPointScore(value: number | undefined, fallback: number) {
+  const score = typeof value === 'number' && value > 0 ? Math.round(value / 10) : fallback
+
+  return `${Math.max(1, Math.min(10, score))}/10`
+}
+
+function createRoleOpeningMessage(scenario: Scenario): Message {
+  return {
+    id: `role-${scenario.id}-opening`,
+    role: 'coach',
+    text: scenario.openingMessage,
+  }
 }
 
 function createInitialMessages(mode: ModeConfig, scenario: Scenario): Message[] {

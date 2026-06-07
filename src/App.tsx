@@ -41,9 +41,22 @@ type Scenario = {
   descriptionZh: string
   goal: string
   opening: string
+  openingMessage: string
   skills: string[]
   sample: string
   image: string
+  characterName: string
+  characterRole: string
+  personality: string
+  voiceStyle: string
+  systemPrompt: string
+  exampleFollowUps: string[]
+  reportProblems: string[]
+  betterExpressions: Array<{
+    lessNatural: string
+    natural: string
+  }>
+  usefulSentences: string[]
 }
 
 type ModeConfig = {
@@ -212,10 +225,50 @@ const scenarios: Scenario[] = [
     level: 'A2-B1',
     descriptionZh: '练习办理登机、托运行李、选择座位、询问登机口和航班信息。',
     goal: '练习办理登机、座位、行李和礼貌询问。',
-    opening: 'Welcome to Skylane Airlines. May I see your passport and booking reference?',
+    opening: 'Good morning. Welcome to Skyway Airlines. May I see your passport and booking reference, please?',
+    openingMessage:
+      'Good morning. Welcome to Skyway Airlines. May I see your passport and booking reference, please?',
     skills: ['polite request', 'travel vocabulary', 'follow-up question'],
     sample: 'Could you please help me check in? I have one suitcase and I would like an aisle seat.',
     image: sceneTravelImage,
+    characterName: 'Emma',
+    characterRole: 'Airport Ground Staff',
+    personality: 'Polite, professional, patient, and slightly formal.',
+    voiceStyle: 'Clear standard English with a slower pace.',
+    systemPrompt:
+      'You are Emma, a polite and professional airport ground staff member. The user is practicing English for airport check-in. Stay in character. Ask for passport and booking reference, checked luggage, seat preference, boarding gate, and boarding time. Use simple, natural English suitable for A2-B1 learners. Ask one question at a time. Do not overcorrect during the conversation. If the user makes a serious mistake, reformulate naturally. When the practice ends, provide feedback in Chinese with grammar, fluency, natural expressions, and useful airport sentences.',
+    exampleFollowUps: [
+      'How many bags would you like to check in?',
+      'Would you prefer a window seat or an aisle seat?',
+      'Do you have any liquids or power banks in your luggage?',
+      'Your boarding gate is B12. Boarding starts at 10:35.',
+    ],
+    reportProblems: [
+      '有些请求句还不够礼貌，可以多用 could / would like。',
+      '机场场景里需要把行李、座位、登机口这些信息说完整。',
+      '短句能表达意思，但需要加 please 让语气更自然。',
+    ],
+    betterExpressions: [
+      {
+        lessNatural: 'I want check in.',
+        natural: "I'd like to check in, please.",
+      },
+      {
+        lessNatural: 'I want window seat.',
+        natural: "I'd like a window seat, please.",
+      },
+      {
+        lessNatural: 'Where boarding?',
+        natural: 'Where is the boarding gate?',
+      },
+    ],
+    usefulSentences: [
+      "I'd like to check in for my flight.",
+      'Could I have a window seat, please?',
+      'How many bags can I check in?',
+      'Where is the boarding gate?',
+      'What time does boarding start?',
+    ],
   },
   {
     id: 'interview',
@@ -224,10 +277,51 @@ const scenarios: Scenario[] = [
     level: 'B1-B2',
     descriptionZh: '练习英文面试开场、自我介绍、经历表达、优势说明和自然回答追问。',
     goal: '练习用具体经历回答问题，并把结果讲清楚。',
-    opening: 'Tell me about yourself and one project you are proud of.',
+    opening:
+      'Hi, nice to meet you. Thanks for joining the interview today. Could you please start by introducing yourself?',
+    openingMessage:
+      'Hi, nice to meet you. Thanks for joining the interview today. Could you please start by introducing yourself?',
     skills: ['STAR answer', 'specific example', 'impact'],
     sample: 'In my last project, I built a dashboard that helped the team compare user feedback faster.',
     image: sceneInterviewImage,
+    characterName: 'James',
+    characterRole: 'Hiring Manager',
+    personality: 'Professional, friendly, structured, and curious.',
+    voiceStyle: 'Natural interview English with a calm business tone.',
+    systemPrompt:
+      'You are James, a professional but friendly HR interviewer. The user is practicing English self-introduction for job interviews. Stay in character. Ask the user to introduce themselves, then ask follow-up questions about education, experience, projects, skills, motivation, and career goals. Keep the interview realistic. Ask one question at a time. Use B1-B2 level English. Do not give long explanations during the interview. When the practice ends, provide feedback in Chinese covering structure, clarity, grammar, vocabulary, confidence, and an improved self-introduction.',
+    exampleFollowUps: [
+      'Could you tell me more about that project?',
+      'What was your specific role in the team?',
+      'Why are you interested in this position?',
+      'Can you give me an example?',
+    ],
+    reportProblems: [
+      '自我介绍需要更清晰的结构，建议按教育背景、经历、技能、岗位动机展开。',
+      '项目经历不要只说做了什么，还要说明你的角色和结果。',
+      '回答可以更具体，少用泛泛的形容词。',
+    ],
+    betterExpressions: [
+      {
+        lessNatural: 'I joined one project and it is good.',
+        natural: 'I worked on a project where I was responsible for user research and data analysis.',
+      },
+      {
+        lessNatural: 'I am good at teamwork.',
+        natural: 'I communicate clearly with teammates and take responsibility for my part of the work.',
+      },
+      {
+        lessNatural: 'I want this job because I like it.',
+        natural: 'I am interested in this role because it matches my experience in product research and communication.',
+      },
+    ],
+    usefulSentences: [
+      'I am currently studying...',
+      'One project I am proud of is...',
+      'My specific role was to...',
+      'This experience helped me develop...',
+      'I am interested in this position because...',
+    ],
   },
   {
     id: 'daily',
@@ -237,9 +331,48 @@ const scenarios: Scenario[] = [
     descriptionZh: '练习日常点单、表达偏好、修改饮品、询问价格、外带或堂食。',
     goal: '练习日常点单、偏好表达和自然追问。',
     opening: 'Hi, what can I get for you today?',
+    openingMessage: 'Hi there! What can I get for you today?',
     skills: ['ordering', 'preference', 'small talk'],
     sample: 'I would like a latte, please. Could you make it less sweet?',
     image: sceneCafeImage,
+    characterName: 'Sophie',
+    characterRole: 'Barista',
+    personality: 'Warm, relaxed, casual, and encouraging.',
+    voiceStyle: 'Friendly everyday English at a comfortable speed.',
+    systemPrompt:
+      'You are Sophie, a friendly barista in a coffee shop. The user is practicing English for ordering coffee. Stay in character. Ask what they would like to order, size, hot or iced, milk choice, sugar, takeaway or dine-in, and tell the price at the end. Use simple casual English suitable for A1-B1 learners. Keep the conversation light and friendly. Do not correct too much during the order. When the practice ends, provide feedback in Chinese with natural ordering expressions.',
+    exampleFollowUps: [
+      'Would you like that hot or iced?',
+      'What size would you like?',
+      'Would you like regular milk, oat milk, or soy milk?',
+      'Is that for here or to go?',
+    ],
+    reportProblems: [
+      '点单时可以少用 I want，多用 Can I have / I would like。',
+      '饮品细节要说完整，例如大小、冷热、奶的类型、堂食或外带。',
+      '日常场景里语气可以更轻松，但仍然要礼貌。',
+    ],
+    betterExpressions: [
+      {
+        lessNatural: 'I want one coffee.',
+        natural: 'Can I have a latte, please?',
+      },
+      {
+        lessNatural: 'Give me cold coffee.',
+        natural: "I'd like an iced latte, please.",
+      },
+      {
+        lessNatural: 'Take away.',
+        natural: 'Could I get that to go?',
+      },
+    ],
+    usefulSentences: [
+      'Can I have a latte, please?',
+      "I'd like an iced latte with oat milk, please.",
+      'Could I get that to go?',
+      'What size do you recommend?',
+      'How much is it altogether?',
+    ],
   },
   {
     id: 'presentation',
@@ -248,10 +381,51 @@ const scenarios: Scenario[] = [
     level: 'B1-B2',
     descriptionZh: '练习英文项目介绍、presentation 开场、问题背景、解决方案和下一步计划。',
     goal: '练习清晰介绍问题、方案和下一步。',
-    opening: 'Please give me a short opening for your project presentation.',
+    opening:
+      "Hi, welcome. You have two minutes to introduce your project. Please start whenever you're ready.",
+    openingMessage:
+      "Hi, welcome. You have two minutes to introduce your project. Please start whenever you're ready.",
     skills: ['structure', 'clarity', 'confidence'],
     sample: 'Today I will introduce an English speaking coach that gives instant feedback after each answer.',
     image: scenePresentationImage,
+    characterName: 'Olivia',
+    characterRole: 'Project Judge',
+    personality: 'Rational, focused, professional, and slightly challenging.',
+    voiceStyle: 'Clear professional English with a confident tone.',
+    systemPrompt:
+      'You are Olivia, a professional project judge, mentor, or investor. The user is practicing the opening of an English project pitch. Stay in character. Ask the user to introduce the project in two minutes, then ask follow-up questions about the problem, target users, solution, competitors, business model, and next steps. Be professional and slightly challenging. Use B1-B2 level English. Ask one question at a time. Help the user improve clarity and structure. When the practice ends, provide feedback in Chinese covering pitch structure, logic, expression, conciseness, and an improved pitch opening.',
+    exampleFollowUps: [
+      'What problem are you trying to solve?',
+      'Who is your target user?',
+      'How is your solution different from existing products?',
+      'What is your next milestone?',
+    ],
+    reportProblems: [
+      '路演开场需要更简洁，先说问题和目标用户，再说解决方案。',
+      '不要只介绍功能，也要说明为什么这个问题值得解决。',
+      '表达可以更有逻辑，例如用 Problem, User, Solution, Difference, Next step。',
+    ],
+    betterExpressions: [
+      {
+        lessNatural: 'Our project is an app and it has many functions.',
+        natural: 'Our project helps international students practice real-life English conversations before they happen.',
+      },
+      {
+        lessNatural: 'The problem is English is hard.',
+        natural: 'The key problem is that learners rarely get instant feedback in realistic speaking situations.',
+      },
+      {
+        lessNatural: 'We are different because AI.',
+        natural: 'We are different because the coach combines scenario role-play, correction, and measurable progress in one flow.',
+      },
+    ],
+    usefulSentences: [
+      'The key problem is...',
+      'Our target users are...',
+      'Our solution helps users...',
+      'Compared with existing products, we...',
+      'Our next milestone is...',
+    ],
   },
 ]
 
@@ -1105,6 +1279,10 @@ function App() {
                 <strong>{scenario.title}</strong>
                 <small>{scenario.titleEn}</small>
                 <p>{scenario.descriptionZh}</p>
+                <div className="scenario-coach-profile">
+                  <span>{scenario.characterName}</span>
+                  <small>{scenario.characterRole}</small>
+                </div>
               </div>
             </button>
           ))}
@@ -1607,7 +1785,7 @@ function createInitialMessages(mode: ModeConfig, scenario: Scenario): Message[] 
     {
       id: `${mode.id}-${scenario.id}-opening`,
       role: 'coach',
-      text: mode.id === 'scenario' ? scenario.opening : mode.opening,
+      text: mode.id === 'scenario' ? scenario.openingMessage : mode.opening,
     },
   ]
 }

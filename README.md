@@ -128,4 +128,6 @@ npm run preview    # 预览生产构建
 
 ## Demo
 
-Demo 视频链接：待补充
+Demo 视频链接：https://www.bilibili.com/video/BV1oCE86FENS/?vd_source=74996823cdce8964ae91ee952add67a5
+
+

@@ -38,6 +38,8 @@ const coachRequestSchema = z.object({
   learnerText: z.string().min(1).max(5000),
   targetLevel: learnerLevelSchema.default('B1'),
   goal: z.string().max(800).default(''),
+  roleName: z.string().max(80).default(''),
+  rolePrompt: z.string().max(2400).default(''),
   history: z.array(chatMessageSchema).max(12).default([]),
   speech: speechMetricsSchema.default({
     inputMethod: 'text',
@@ -198,6 +200,8 @@ app.post('/api/speaking/feedback', async (request, response) => {
       learnerText: parsed.data.learnerText,
       targetLevel: 'B1',
       goal: '',
+      roleName: '',
+      rolePrompt: '',
       history: parsed.data.history,
       speech: {
         inputMethod: 'text',
@@ -292,6 +296,8 @@ async function createModelCoachOutput(input: CoachRequest) {
             targetLevel: input.targetLevel,
             userGoal: input.goal,
             scenario: input.scenarioTitle,
+            roleName: input.roleName,
+            rolePrompt: input.rolePrompt,
             learnerText: input.learnerText,
             recentHistory: input.history,
             speechMetrics: input.speech,
@@ -334,6 +340,7 @@ function createSystemPrompt() {
   return [
     'You are SpeakPilot, a model-backed English speaking coach for Chinese learners.',
     'Coach beyond scripted role-play: support free conversation, grammar diagnosis, vocabulary building, study planning, and scenario practice.',
+    'If rolePrompt is provided, treat it as the active role-play instruction. Stay in that named character for coachReply and ask one natural follow-up question at a time.',
     'Be encouraging, specific, and practical. Keep explanations concise enough for an app UI.',
     'Return only valid JSON. Do not wrap JSON in markdown.',
     'The JSON must match this TypeScript shape:',
@@ -413,7 +420,7 @@ function createFallbackCoachOutput(input: CoachRequest): CoachOutput {
     strengths: createStrengths(words.length, uniqueWords.size, usedTargetVocabulary),
     improvements: createImprovements(input.mode, input.scenarioId, words.length, fillerCount),
     suggestedRewrite: createRewrite(input.mode, input.scenarioId, cleanedText),
-    coachReply: createCoachReply(input.mode, input.scenarioId, cleanedText, input.goal),
+    coachReply: createCoachReply(input, cleanedText),
     nextPrompt: createNextPrompt(input.mode, input.scenarioId, input.goal),
     vocabulary: createVocabulary(input.mode, input.scenarioId, usedTargetVocabulary),
     drills: createDrills(input.mode, input.scenarioId, input.targetLevel),
@@ -595,7 +602,13 @@ function createRewrite(mode: CoachMode, scenarioId: string, text: string) {
   return ending
 }
 
-function createCoachReply(mode: CoachMode, scenarioId: string, text: string, goal: string) {
+function createCoachReply(input: CoachRequest, text: string) {
+  const { goal, mode, roleName, scenarioId } = input
+
+  if (mode === 'scenario' && roleName) {
+    return createCharacterReply(input)
+  }
+
   if (mode === 'freeTalk' && text.split(' ').length < 4) {
     return createShortFreeTalkReply(text)
   }
@@ -630,6 +643,58 @@ function createCoachReply(mode: CoachMode, scenarioId: string, text: string, goa
   }
 
   return replies[scenarioId] ?? 'Good answer. Can you add one more detail and ask me a follow-up question?'
+}
+
+function createCharacterReply(input: CoachRequest) {
+  const turnCount = input.history.filter((message) => message.role === 'learner').length
+  const normalizedText = input.learnerText.toLowerCase()
+
+  if (normalizedText.split(/\s+/).filter(Boolean).length < 4) {
+    const shortReplies: Record<string, string> = {
+      travel:
+        'No problem. Try a full sentence: "I would like to check in, please." May I see your passport and booking reference?',
+      interview:
+        'That is a start. Please give me a fuller self-introduction with your study background and one relevant experience.',
+      daily:
+        'Sure. Try: "Can I have a latte, please?" What drink would you like today?',
+      presentation:
+        'Please give me a fuller opening. Start with the problem your project is trying to solve.',
+    }
+
+    return shortReplies[input.scenarioId] ?? 'Please answer in one full sentence so we can continue naturally.'
+  }
+
+  const repliesByScenario: Record<string, string[]> = {
+    travel: [
+      'Thank you. Are you checking in any bags today?',
+      'Great. Would you prefer a window seat or an aisle seat?',
+      'Your boarding gate is B12, and boarding starts at 10:35. Do you have any questions about your flight?',
+      'All set. Please keep your passport and boarding pass ready for security.',
+    ],
+    interview: [
+      'Thanks for the introduction. Could you tell me more about one project or experience that is most relevant to this role?',
+      'What was your specific role in the team, and what result did you achieve?',
+      'Why are you interested in this position?',
+      'What would you say is your biggest strength? Please give me one example.',
+    ],
+    daily: [
+      'Sounds good. Would you like that hot or iced?',
+      'What size would you like, and would you prefer regular milk, oat milk, or soy milk?',
+      'Is that for here or to go?',
+      'Great, that will be 4 pounds 20. Anything else today?',
+    ],
+    presentation: [
+      'Thank you. What problem are you trying to solve?',
+      'Who is your target user, and why do they need this solution?',
+      'How is your solution different from existing products?',
+      'What is your next milestone after this demo?',
+    ],
+  }
+  const replies = repliesByScenario[input.scenarioId] ?? [
+    'Good answer. Can you add one specific detail so the conversation feels more natural?',
+  ]
+
+  return replies[Math.min(Math.max(turnCount - 1, 0), replies.length - 1)]
 }
 
 function createShortFreeTalkReply(text: string) {

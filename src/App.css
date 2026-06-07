@@ -675,6 +675,20 @@
   width: min(1120px, calc(100vw - 44px));
 }
 
+.role-dialog.dragging {
+  box-shadow: 0 48px 160px rgba(0, 0, 0, 0.58);
+}
+
+.role-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.role-dialog.dragging .role-drag-handle {
+  cursor: grabbing;
+}
+
 .role-profile-panel {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
@@ -1000,6 +1014,8 @@
   gap: 10px;
 }
 
+.role-voice-button,
+.role-audio-button,
 .role-send-button,
 .role-secondary-button {
   align-items: center;
@@ -1011,6 +1027,34 @@
   justify-content: center;
   min-height: 42px;
   padding: 0 14px;
+}
+
+.role-voice-button {
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #64748b;
+}
+
+.role-voice-button.listening {
+  background: rgba(255, 241, 240, 0.96);
+  border-color: rgba(255, 69, 58, 0.3);
+  color: #c92a2a;
+}
+
+.role-audio-button {
+  background: rgba(239, 246, 255, 0.92);
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  color: #2563eb;
+}
+
+.role-audio-button.active {
+  background: rgba(232, 247, 240, 0.92);
+  border-color: rgba(18, 184, 134, 0.28);
+  color: #087f5b;
+}
+
+.role-audio-button.speaking {
+  box-shadow: 0 0 0 4px rgba(18, 184, 134, 0.12);
 }
 
 .role-send-button {
@@ -1026,6 +1070,8 @@
   color: #334155;
 }
 
+.role-voice-button:disabled,
+.role-audio-button:disabled,
 .role-send-button:disabled,
 .role-secondary-button:disabled {
   cursor: not-allowed;

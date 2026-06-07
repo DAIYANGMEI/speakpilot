@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import heroImage from './assets/hero.png'
 import sceneCafeImage from './assets/scene-cafe.svg'
 import sceneInterviewImage from './assets/scene-interview.svg'
@@ -35,6 +35,20 @@ type CopyStatus = 'idle' | 'copied' | 'error'
 type VoiceFlowStatus = 'idle' | 'listening' | 'processing' | 'speaking'
 type PracticeMode = 'scenario' | 'freeTalk' | 'grammar' | 'plan' | 'vocabulary'
 type LearnerLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
+
+type DialogOffset = {
+  x: number
+  y: number
+}
+
+type RoleDragState = {
+  startX: number
+  startY: number
+  originX: number
+  originY: number
+  width: number
+  height: number
+}
 
 type Scenario = {
   id: string
@@ -748,6 +762,11 @@ function App() {
   const [roleFeedback, setRoleFeedback] = useState<CoachFeedback | null>(null)
   const [isRoleSubmitting, setIsRoleSubmitting] = useState(false)
   const [isRoleEnded, setIsRoleEnded] = useState(false)
+  const [isRoleListening, setIsRoleListening] = useState(false)
+  const [isRoleSpeaking, setIsRoleSpeaking] = useState(false)
+  const [roleAutoSpeak, setRoleAutoSpeak] = useState(true)
+  const [roleDialogOffset, setRoleDialogOffset] = useState<DialogOffset>({ x: 0, y: 0 })
+  const [isRoleDialogDragging, setIsRoleDialogDragging] = useState(false)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>(() =>
     'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [],
@@ -764,13 +783,17 @@ function App() {
   )
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const messageListRef = useRef<HTMLDivElement | null>(null)
+  const roleDialogRef = useRef<HTMLDivElement | null>(null)
   const roleMessageListRef = useRef<HTMLDivElement | null>(null)
+  const roleRecognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const latestTranscriptRef = useRef('')
+  const roleLatestTranscriptRef = useRef('')
   const shouldSubmitVoiceRef = useRef(false)
   const autoSubmitTimerRef = useRef<number | null>(null)
   const speechMetricsRef = useRef<SpeechMetrics>(speechMetrics)
   const isSubmittingRef = useRef(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const roleDragRef = useRef<RoleDragState | null>(null)
 
   const currentScenario = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0],
@@ -861,11 +884,49 @@ function App() {
   }, [isSubmitting])
 
   useEffect(() => {
+    if (!isRoleDialogDragging) {
+      return undefined
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const dragState = roleDragRef.current
+
+      if (!dragState) {
+        return
+      }
+
+      const nextOffset = clampDialogOffset(
+        dragState.originX + event.clientX - dragState.startX,
+        dragState.originY + event.clientY - dragState.startY,
+        dragState.width,
+        dragState.height,
+      )
+      setRoleDialogOffset(nextOffset)
+    }
+
+    function stopDragging() {
+      roleDragRef.current = null
+      setIsRoleDialogDragging(false)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', stopDragging, { once: true })
+    window.addEventListener('pointercancel', stopDragging, { once: true })
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', stopDragging)
+      window.removeEventListener('pointercancel', stopDragging)
+    }
+  }, [isRoleDialogDragging])
+
+  useEffect(() => {
     return () => {
       if (autoSubmitTimerRef.current !== null) {
         window.clearTimeout(autoSubmitTimerRef.current)
         autoSubmitTimerRef.current = null
       }
+      roleRecognitionRef.current?.stop()
       window.speechSynthesis?.cancel()
     }
   }, [])
@@ -1158,6 +1219,122 @@ function App() {
     window.speechSynthesis.speak(utterance)
   }
 
+  function speakRoleReply(text: string, scenario: Scenario) {
+    if (!('speechSynthesis' in window)) {
+      setIsRoleSpeaking(false)
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.resume()
+    const voiceSettings = getRoleVoiceSettings(scenario.id)
+    const utterance = new SpeechSynthesisUtterance(text)
+    utteranceRef.current = utterance
+    utterance.lang = voiceSettings.lang
+    utterance.voice = selectedCoachVoice ?? null
+    utterance.rate = voiceSettings.rate
+    utterance.pitch = voiceSettings.pitch
+    utterance.volume = 0.96
+    utterance.onstart = () => setIsRoleSpeaking(true)
+    utterance.onend = () => {
+      if (utteranceRef.current === utterance) {
+        utteranceRef.current = null
+      }
+      setIsRoleSpeaking(false)
+    }
+    utterance.onerror = () => {
+      if (utteranceRef.current === utterance) {
+        utteranceRef.current = null
+      }
+      setIsRoleSpeaking(false)
+    }
+    window.speechSynthesis.speak(utterance)
+  }
+
+  function cancelRoleVoice() {
+    window.speechSynthesis?.cancel()
+    utteranceRef.current = null
+    setIsRoleSpeaking(false)
+  }
+
+  function toggleRoleListening() {
+    if (isRoleListening) {
+      stopRoleListening()
+      return
+    }
+
+    if (isRoleEnded) {
+      return
+    }
+
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
+
+    if (!Recognition) {
+      return
+    }
+
+    if (isListening) {
+      stopListening(false)
+    }
+
+    clearAutoSubmitTimer()
+    cancelCoachVoice()
+    const recognition = new Recognition()
+    roleLatestTranscriptRef.current = roleDraft.trim()
+    recognition.lang = 'en-US'
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.maxAlternatives = 1
+    recognition.onresult = (event) => {
+      let transcript = ''
+
+      for (let index = 0; index < event.results.length; index += 1) {
+        transcript += `${event.results[index][0].transcript} `
+      }
+
+      const nextTranscript = transcript.replace(/\s+/g, ' ').trim()
+      roleLatestTranscriptRef.current = nextTranscript
+      setRoleDraft(nextTranscript)
+    }
+    recognition.onerror = () => {
+      roleRecognitionRef.current = null
+      setIsRoleListening(false)
+    }
+    recognition.onend = () => {
+      roleRecognitionRef.current = null
+      setIsRoleListening(false)
+    }
+    try {
+      roleRecognitionRef.current = recognition
+      recognition.start()
+      setIsRoleListening(true)
+    } catch {
+      roleRecognitionRef.current = null
+      setIsRoleListening(false)
+    }
+  }
+
+  function stopRoleListening() {
+    roleRecognitionRef.current?.stop()
+    roleRecognitionRef.current = null
+    setIsRoleListening(false)
+  }
+
+  function toggleRoleAutoSpeak() {
+    const nextAutoSpeak = !roleAutoSpeak
+    setRoleAutoSpeak(nextAutoSpeak)
+
+    if (!nextAutoSpeak) {
+      cancelRoleVoice()
+      return
+    }
+
+    if (activeRoleScenario) {
+      const lastCoachMessage = [...roleMessages].reverse().find((message) => message.role === 'coach')
+      speakRoleReply(lastCoachMessage?.text ?? activeRoleScenario.openingMessage, activeRoleScenario)
+    }
+  }
+
   function resetPractice() {
     setMessages(createInitialMessages(currentMode, currentScenario))
     setFeedback(initialFeedback)
@@ -1190,7 +1367,32 @@ function App() {
     stopListening(false)
   }
 
+  function startRoleDialogDrag(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return
+    }
+
+    const dialog = roleDialogRef.current
+
+    if (!dialog) {
+      return
+    }
+
+    event.preventDefault()
+    const rect = dialog.getBoundingClientRect()
+    roleDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: roleDialogOffset.x,
+      originY: roleDialogOffset.y,
+      width: rect.width,
+      height: rect.height,
+    }
+    setIsRoleDialogDragging(true)
+  }
+
   function openRoleDialog(scenario: Scenario) {
+    stopRoleListening()
     setSelectedMode('scenario')
     setSelectedScenarioId(scenario.id)
     setMessages(createInitialMessages(modes[0], scenario))
@@ -1207,15 +1409,25 @@ function App() {
     setRoleFeedback(null)
     setIsRoleEnded(false)
     setIsRoleSubmitting(false)
+    setRoleDialogOffset({ x: 0, y: 0 })
+    setIsRoleDialogDragging(false)
+    roleDragRef.current = null
+    if (roleAutoSpeak) {
+      speakRoleReply(scenario.openingMessage, scenario)
+    }
   }
 
   function closeRoleDialog() {
+    stopRoleListening()
+    cancelRoleVoice()
     setRoleScenarioId(null)
     setRoleMessages([])
     setRoleDraft('')
     setRoleFeedback(null)
     setIsRoleEnded(false)
     setIsRoleSubmitting(false)
+    setIsRoleDialogDragging(false)
+    roleDragRef.current = null
   }
 
   async function submitRoleAnswer() {
@@ -1226,6 +1438,7 @@ function App() {
       return
     }
 
+    stopRoleListening()
     const learnerMessage: Message = {
       id: crypto.randomUUID(),
       role: 'learner',
@@ -1292,7 +1505,11 @@ function App() {
         provider: enrichedFeedback.provider.label,
         source: enrichedFeedback.provider.source,
       })
+      if (roleAutoSpeak) {
+        speakRoleReply(enrichedFeedback.coachReply, scenario)
+      }
     } catch {
+      cancelRoleVoice()
       setRoleMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -1311,7 +1528,9 @@ function App() {
       return
     }
 
+    stopRoleListening()
     setIsRoleEnded(true)
+    cancelRoleVoice()
     setRoleMessages((currentMessages) => [
       ...currentMessages,
       {
@@ -1946,12 +2165,22 @@ function App() {
           className="role-dialog-layer"
           role="dialog"
         >
-          <div className="role-dialog">
+          <div
+            className={`role-dialog ${isRoleDialogDragging ? 'dragging' : ''}`}
+            ref={roleDialogRef}
+            style={{
+              transform: `translate3d(${roleDialogOffset.x}px, ${roleDialogOffset.y}px, 0)`,
+            }}
+          >
             <aside className="role-profile-panel">
               <button className="role-close-button" onClick={closeRoleDialog} title="关闭角色陪练" type="button">
                 <X size={18} />
               </button>
-              <div className="role-profile-hero">
+              <div
+                className="role-profile-hero role-drag-handle"
+                onDoubleClick={() => setRoleDialogOffset({ x: 0, y: 0 })}
+                onPointerDown={startRoleDialogDrag}
+              >
                 <RoleAvatar scenario={activeRoleScenario} size="large" />
                 <div>
                   <p>{activeRoleScenario.titleEn}</p>
@@ -1975,7 +2204,11 @@ function App() {
             </aside>
 
             <section className="role-chat-panel">
-              <header className="role-chat-header">
+              <header
+                className="role-chat-header role-drag-handle"
+                onDoubleClick={() => setRoleDialogOffset({ x: 0, y: 0 })}
+                onPointerDown={startRoleDialogDrag}
+              >
                 <div>
                   <p>{activeRoleScenario.title}</p>
                   <h2 id="role-dialog-title">
@@ -2094,6 +2327,25 @@ function App() {
                   value={roleDraft}
                 />
                 <div className="role-actions">
+                  <button
+                    className={`role-voice-button ${isRoleListening ? 'listening' : ''}`}
+                    disabled={!speechSupported || isRoleEnded}
+                    onClick={toggleRoleListening}
+                    title={speechSupported ? '语音输入' : '当前浏览器不支持语音输入'}
+                    type="button"
+                  >
+                    {isRoleListening ? <MicOff size={17} /> : <Mic size={17} />}
+                    <span>{isRoleListening ? 'Listening' : 'Speak'}</span>
+                  </button>
+                  <button
+                    className={`role-audio-button ${roleAutoSpeak ? 'active' : ''} ${isRoleSpeaking ? 'speaking' : ''}`}
+                    onClick={toggleRoleAutoSpeak}
+                    title="自动朗读角色回复"
+                    type="button"
+                  >
+                    {roleAutoSpeak ? <Volume2 size={17} /> : <VolumeX size={17} />}
+                    <span>{isRoleSpeaking ? 'Speaking' : roleAutoSpeak ? 'Voice on' : 'Voice off'}</span>
+                  </button>
                   <button className="role-send-button" disabled={!canSubmitRole} type="submit">
                     {isRoleSubmitting ? <Loader2 className="spin-icon" size={17} /> : <Send size={17} />}
                     <span>Send</span>
@@ -2146,6 +2398,48 @@ function formatTenPointScore(value: number | undefined, fallback: number) {
   const score = typeof value === 'number' && value > 0 ? Math.round(value / 10) : fallback
 
   return `${Math.max(1, Math.min(10, score))}/10`
+}
+
+function clampDialogOffset(x: number, y: number, width: number, height: number): DialogOffset {
+  const margin = 12
+  const maxX = Math.max(0, (window.innerWidth - width) / 2 - margin)
+  const maxY = Math.max(0, (window.innerHeight - height) / 2 - margin)
+
+  return {
+    x: Math.max(-maxX, Math.min(maxX, x)),
+    y: Math.max(-maxY, Math.min(maxY, y)),
+  }
+}
+
+function getRoleVoiceSettings(scenarioId: string) {
+  const settings: Record<string, { lang: string; pitch: number; rate: number }> = {
+    travel: {
+      lang: 'en-GB',
+      pitch: 1.08,
+      rate: 0.84,
+    },
+    interview: {
+      lang: 'en-US',
+      pitch: 0.98,
+      rate: 0.9,
+    },
+    daily: {
+      lang: 'en-US',
+      pitch: 1.18,
+      rate: 0.9,
+    },
+    presentation: {
+      lang: 'en-US',
+      pitch: 1,
+      rate: 0.88,
+    },
+  }
+
+  return settings[scenarioId] ?? {
+    lang: 'en-US',
+    pitch: 1.08,
+    rate: 0.9,
+  }
 }
 
 function createRoleOpeningMessage(scenario: Scenario): Message {

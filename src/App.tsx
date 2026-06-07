@@ -21,6 +21,10 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import heroImage from './assets/hero.png'
+import sceneCafeImage from './assets/scene-cafe.svg'
+import sceneInterviewImage from './assets/scene-interview.svg'
+import scenePresentationImage from './assets/scene-presentation.svg'
+import sceneTravelImage from './assets/scene-travel.svg'
 import './App.css'
 
 type ApiStatus = 'checking' | 'ready' | 'error'
@@ -32,11 +36,14 @@ type LearnerLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
 type Scenario = {
   id: string
   title: string
+  titleEn: string
   level: string
+  descriptionZh: string
   goal: string
   opening: string
   skills: string[]
   sample: string
+  image: string
 }
 
 type ModeConfig = {
@@ -201,38 +208,50 @@ const scenarios: Scenario[] = [
   {
     id: 'travel',
     title: '机场值机',
+    titleEn: 'Airport Check-in',
     level: 'A2-B1',
+    descriptionZh: '练习办理登机、托运行李、选择座位、询问登机口和航班信息。',
     goal: '练习办理登机、座位、行李和礼貌询问。',
     opening: 'Welcome to Skylane Airlines. May I see your passport and booking reference?',
     skills: ['polite request', 'travel vocabulary', 'follow-up question'],
     sample: 'Could you please help me check in? I have one suitcase and I would like an aisle seat.',
+    image: sceneTravelImage,
   },
   {
     id: 'interview',
     title: '面试自我介绍',
+    titleEn: 'Interview Self-introduction',
     level: 'B1-B2',
+    descriptionZh: '练习英文面试开场、自我介绍、经历表达、优势说明和自然回答追问。',
     goal: '练习用具体经历回答问题，并把结果讲清楚。',
     opening: 'Tell me about yourself and one project you are proud of.',
     skills: ['STAR answer', 'specific example', 'impact'],
     sample: 'In my last project, I built a dashboard that helped the team compare user feedback faster.',
+    image: sceneInterviewImage,
   },
   {
     id: 'daily',
     title: '咖啡店点单',
+    titleEn: 'Coffee Shop Ordering',
     level: 'A1-B1',
+    descriptionZh: '练习日常点单、表达偏好、修改饮品、询问价格、外带或堂食。',
     goal: '练习日常点单、偏好表达和自然追问。',
     opening: 'Hi, what can I get for you today?',
     skills: ['ordering', 'preference', 'small talk'],
     sample: 'I would like a latte, please. Could you make it less sweet?',
+    image: sceneCafeImage,
   },
   {
     id: 'presentation',
     title: '项目路演开场',
+    titleEn: 'Project Pitch Opening',
     level: 'B1-B2',
+    descriptionZh: '练习英文项目介绍、presentation 开场、问题背景、解决方案和下一步计划。',
     goal: '练习清晰介绍问题、方案和下一步。',
     opening: 'Please give me a short opening for your project presentation.',
     skills: ['structure', 'clarity', 'confidence'],
     sample: 'Today I will introduce an English speaking coach that gives instant feedback after each answer.',
+    image: scenePresentationImage,
   },
 ]
 
@@ -999,6 +1018,7 @@ function App() {
         </a>
         <nav aria-label="product navigation">
           <a href="#product">Product</a>
+          <a href="#scenarios">Scenarios</a>
           <a href="#workflow">Workflow</a>
           <a href="#coach">Practice</a>
         </nav>
@@ -1058,6 +1078,36 @@ function App() {
               <Mic size={30} />
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="scenario-showcase product-page" id="scenarios">
+        <div className="section-kicker">
+          <p>Scenario practice</p>
+          <h2>Choose the moment you want to rehearse</h2>
+          <strong>Each card starts from a real-life English task, with level, goal, and starter context.</strong>
+        </div>
+
+        <div className="showcase-grid">
+          {scenarios.map((scenario) => (
+            <button
+              className={`showcase-card ${scenario.id}`}
+              key={`showcase-${scenario.id}`}
+              onClick={() => {
+                selectScenario(scenario)
+                document.querySelector('#coach')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+              type="button"
+            >
+              <img alt="" src={scenario.image} />
+              <div>
+                <span>{scenario.level}</span>
+                <strong>{scenario.title}</strong>
+                <small>{scenario.titleEn}</small>
+                <p>{scenario.descriptionZh}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </section>
 

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs>
+    <linearGradient id="cafe" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fef3c7"/>
+      <stop offset=".5" stop-color="#fdba74"/>
+      <stop offset="1" stop-color="#fb7185"/>
+    </linearGradient>
+    <linearGradient id="cup" x1="0" x2="1">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="420" rx="36" fill="url(#cafe)"/>
+  <circle cx="112" cy="92" r="52" fill="#ffffff" opacity=".38"/>
+  <circle cx="528" cy="92" r="42" fill="#ffffff" opacity=".28"/>
+  <rect x="76" y="284" width="488" height="52" rx="26" fill="#7c2d12" opacity=".84"/>
+  <path d="M232 154h154l-18 138H250z" fill="url(#cup)"/>
+  <path d="M240 178h138" stroke="#92400e" stroke-width="14" stroke-linecap="round"/>
+  <path d="M388 190h32c34 0 34 72-4 72h-38" fill="none" stroke="#fff7ed" stroke-width="18" stroke-linecap="round"/>
+  <path d="M284 104c-22 24 22 34 0 58M342 98c-18 22 20 32 0 52" fill="none" stroke="#7c2d12" stroke-width="12" stroke-linecap="round" opacity=".72"/>
+  <rect x="112" y="218" width="94" height="56" rx="18" fill="#fef9c3" opacity=".92"/>
+  <path d="M132 246h54" stroke="#f97316" stroke-width="10" stroke-linecap="round"/>
+  <rect x="436" y="210" width="92" height="70" rx="20" fill="#fecdd3" opacity=".95"/>
+  <path d="M458 238h48m-36 24h28" stroke="#be123c" stroke-width="9" stroke-linecap="round"/>
+</svg>

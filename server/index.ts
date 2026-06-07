@@ -433,13 +433,14 @@ function createFallbackCoachOutput(input: CoachRequest): CoachOutput {
 }
 
 function getAiConfig() {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || ''
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || ''
   const baseUrl = (
+    process.env.DEEPSEEK_BASE_URL ||
     process.env.OPENAI_BASE_URL ||
     process.env.LLM_BASE_URL ||
-    'https://api.openai.com/v1'
+    'https://api.deepseek.com'
   ).replace(/\/$/, '')
-  const model = process.env.OPENAI_MODEL || process.env.LLM_MODEL || 'chat-latest'
+  const model = process.env.DEEPSEEK_MODEL || process.env.OPENAI_MODEL || process.env.LLM_MODEL || 'deepseek-chat'
 
   return {
     apiKey,
@@ -460,6 +461,10 @@ function getPublicAiStatus() {
 }
 
 function getProviderLabel(baseUrl: string) {
+  if (baseUrl.includes('api.deepseek.com')) {
+    return 'DeepSeek'
+  }
+
   return baseUrl.includes('api.openai.com') ? 'OpenAI-compatible' : 'Custom model endpoint'
 }
 

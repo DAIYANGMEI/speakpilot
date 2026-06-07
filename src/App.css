@@ -17,9 +17,366 @@
   --workspace-height: clamp(760px, calc(100vh - 72px), 960px);
 }
 
+.product-shell {
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(2, 8, 18, 1) 52%, rgba(7, 3, 18, 1) 100%),
+    #020617;
+  color: #f8fafc;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.product-nav {
+  align-items: center;
+  backdrop-filter: blur(22px);
+  background: rgba(2, 6, 23, 0.72);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
+  min-height: 76px;
+  padding: 12px 36px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.nav-brand {
+  align-items: center;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 900;
+  gap: 10px;
+  letter-spacing: 2px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.nav-brand img {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  height: 34px;
+  padding: 5px;
+  width: 34px;
+}
+
+.product-nav nav {
+  align-items: center;
+  display: flex;
+  gap: 28px;
+}
+
+.product-nav nav a,
+.product-footer a {
+  color: rgba(248, 250, 252, 0.78);
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.product-nav nav a:hover,
+.product-footer a:hover {
+  color: #ffffff;
+}
+
+.nav-cta {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 800;
+  justify-self: end;
+  min-width: 156px;
+  padding: 13px 18px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.product-page {
+  margin: 0 auto;
+  max-width: 1460px;
+  scroll-margin-top: 86px;
+}
+
+.product-hero {
+  align-items: center;
+  display: grid;
+  gap: 56px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+  min-height: calc(100vh - 76px);
+  padding: 86px 36px 76px;
+}
+
+.hero-copy,
+.workflow-copy {
+  display: grid;
+  gap: 28px;
+}
+
+.hero-copy > p,
+.workflow-copy > p {
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.hero-copy h1,
+.workflow-copy h2 {
+  color: #ffffff;
+  font-size: 72px;
+  letter-spacing: 0;
+  line-height: 1.02;
+  max-width: 760px;
+}
+
+.hero-copy h1 span,
+.workflow-copy h2 span {
+  background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6, #fdba74);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-copy > strong,
+.workflow-copy > strong {
+  color: rgba(248, 250, 252, 0.82);
+  display: block;
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.45;
+  max-width: 720px;
+}
+
+.hero-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.hero-actions a {
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  min-width: 166px;
+  padding: 16px 22px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.hero-actions a:first-child {
+  background: linear-gradient(135deg, #60a5fa, #c084fc, #f472b6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.hero-actions a:last-child {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.hero-stats,
+.workflow-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.hero-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 620px;
+}
+
+.hero-stats article,
+.workflow-stack article {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 18px 64px rgba(0, 0, 0, 0.22);
+  padding: 16px;
+}
+
+.hero-stats article {
+  display: grid;
+  gap: 4px;
+}
+
+.hero-stats span {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.hero-stats small,
+.workflow-stack p {
+  color: rgba(248, 250, 252, 0.62);
+  font-weight: 700;
+}
+
+.hero-gradient-card {
+  background:
+    linear-gradient(135deg, rgba(56, 189, 248, 0.92), rgba(167, 139, 250, 0.9) 44%, rgba(251, 113, 133, 0.82)),
+    #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 36px 120px rgba(37, 99, 235, 0.28);
+  display: grid;
+  gap: 18px;
+  min-height: 560px;
+  overflow: hidden;
+  padding: 26px;
+  position: relative;
+}
+
+.hero-gradient-card::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
+  background-size: 84px 84px;
+  content: '';
+  inset: 0;
+  opacity: 0.28;
+  position: absolute;
+}
+
+.mock-toolbar,
+.mock-prompt,
+.mock-message,
+.voice-orbit {
+  position: relative;
+  z-index: 1;
+}
+
+.mock-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.mock-toolbar span {
+  background: rgba(255, 255, 255, 0.74);
+  border-radius: 999px;
+  height: 12px;
+  width: 12px;
+}
+
+.mock-prompt,
+.mock-message {
+  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  color: #111827;
+  padding: 22px;
+}
+
+.mock-prompt {
+  margin-top: 56px;
+  max-width: 520px;
+}
+
+.mock-prompt p,
+.mock-message span {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.mock-prompt strong {
+  display: block;
+  font-size: 26px;
+  line-height: 1.25;
+  margin-top: 8px;
+}
+
+.mock-message {
+  max-width: 520px;
+}
+
+.mock-message.learner {
+  justify-self: end;
+}
+
+.mock-message p {
+  color: #1f2937;
+  font-size: 18px;
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.voice-orbit {
+  align-items: center;
+  align-self: end;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  box-shadow: 0 18px 54px rgba(2, 6, 23, 0.24);
+  color: #7c3aed;
+  display: inline-flex;
+  height: 86px;
+  justify-content: center;
+  justify-self: end;
+  width: 86px;
+}
+
+.workflow-section {
+  align-items: center;
+  display: grid;
+  gap: 42px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+  padding: 86px 36px;
+}
+
+.workflow-stack article {
+  display: grid;
+  gap: 10px;
+}
+
+.workflow-stack span {
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.workflow-stack strong {
+  color: #ffffff;
+  font-size: 21px;
+}
+
+.practice-section {
+  min-height: auto;
+  padding: 18px 36px 88px;
+}
+
+.product-footer {
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.72);
+  display: flex;
+  justify-content: space-between;
+  padding: 28px 36px 42px;
+}
+
+.product-footer span {
+  color: #ffffff;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 18px;
+}
+
+.app-shell.practice-section {
+  min-height: auto;
+  padding: 18px 36px 88px;
 }
 
 .topbar {

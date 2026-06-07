@@ -991,8 +991,108 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="topbar" aria-label="app status">
+    <main className="product-shell">
+      <header className="product-nav">
+        <a className="nav-brand" href="#product">
+          <img alt="" src={heroImage} />
+          <span>SpeakPilot</span>
+        </a>
+        <nav aria-label="product navigation">
+          <a href="#product">Product</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#coach">Practice</a>
+        </nav>
+        <a className="nav-cta" href="#coach">Start practice</a>
+      </header>
+
+      <section className="product-hero product-page" id="product">
+        <div className="hero-copy">
+          <p>AI English speaking coach</p>
+          <h1>
+            Practice real English before <span>the real moment</span>
+          </h1>
+          <strong>
+            SpeakPilot helps learners rehearse realistic conversations, get instant feedback, and turn rough
+            answers into clearer spoken English.
+          </strong>
+          <div className="hero-actions">
+            <a href="#coach">Open workspace</a>
+            <a href="#workflow">See workflow</a>
+          </div>
+          <div className="hero-stats" aria-label="product highlights">
+            <article>
+              <span>5</span>
+              <small>practice modes</small>
+            </article>
+            <article>
+              <span>Live</span>
+              <small>voice feedback</small>
+            </article>
+            <article>
+              <span>A1-C1</span>
+              <small>level support</small>
+            </article>
+          </div>
+        </div>
+
+        <div className="hero-visual" aria-label="speaking coach preview">
+          <div className="hero-gradient-card">
+            <div className="mock-toolbar">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="mock-prompt">
+              <p>Coach</p>
+              <strong>Give one complete answer, then ask a natural follow-up question.</strong>
+            </div>
+            <div className="mock-message learner">
+              <span>You</span>
+              <p>I would like to explain my project more clearly.</p>
+            </div>
+            <div className="mock-message coach">
+              <span>Feedback</span>
+              <p>Better: I would like to explain the problem, solution, and next step more clearly.</p>
+            </div>
+            <div className="voice-orbit">
+              <Mic size={30} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="workflow-section product-page" id="workflow">
+        <div className="workflow-copy">
+          <p>Practice loop</p>
+          <h2>
+            One answer becomes a <span>better next answer</span>
+          </h2>
+          <strong>
+            The workspace keeps the learner in a simple loop: choose a mode, speak or type, receive focused
+            feedback, then improve the next turn.
+          </strong>
+        </div>
+        <div className="workflow-stack">
+          <article>
+            <span>01</span>
+            <strong>Choose a practice goal</strong>
+            <p>Pick a mode, level, and concrete speaking target.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <strong>Answer aloud or by text</strong>
+            <p>Use starter phrases and readiness checks to shape the reply.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <strong>Review actionable feedback</strong>
+            <p>Improve fluency, grammar, vocabulary, pronunciation, and interaction.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="app-shell practice-section product-page" id="coach">
+        <section className="topbar" aria-label="app status">
         <div className="brand-mark">
           <img alt="" src={heroImage} />
           <div>
@@ -1442,6 +1542,12 @@ function App() {
           </section>
         </aside>
       </section>
+      </section>
+
+      <footer className="product-footer product-page">
+        <span>SpeakPilot</span>
+        <a href="#product">Back to top</a>
+      </footer>
     </main>
   )
 }

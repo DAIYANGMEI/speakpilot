@@ -35,6 +35,8 @@ type CopyStatus = 'idle' | 'copied' | 'error'
 type VoiceFlowStatus = 'idle' | 'listening' | 'processing' | 'speaking'
 type PracticeMode = 'scenario' | 'freeTalk' | 'grammar' | 'plan' | 'vocabulary'
 type LearnerLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
+type CompanionTab = 'memory' | 'review' | 'chat'
+type CompanionAction = 'idle' | 'wave' | 'hop' | 'sparkle'
 
 type DialogOffset = {
   x: number
@@ -226,6 +228,12 @@ type PracticeHistoryItem = {
 type ReadinessItem = {
   label: string
   complete: boolean
+}
+
+type CompanionTabConfig = {
+  id: CompanionTab
+  icon: LucideIcon
+  label: string
 }
 
 declare global {
@@ -500,6 +508,11 @@ const modes: ModeConfig[] = [
 ]
 
 const levels: LearnerLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1']
+const companionTabs: CompanionTabConfig[] = [
+  { id: 'memory', icon: BookOpen, label: '记忆' },
+  { id: 'review', icon: Brain, label: '复习' },
+  { id: 'chat', icon: MessageSquareText, label: '互动' },
+]
 const preferredVoiceNames = [
   'samantha',
   'jenny',
@@ -756,6 +769,10 @@ function App() {
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [autoSubmitVoice, setAutoSubmitVoice] = useState(true)
   const [voiceFlowStatus, setVoiceFlowStatus] = useState<VoiceFlowStatus>('idle')
+  const [companionOpen, setCompanionOpen] = useState(true)
+  const [companionTab, setCompanionTab] = useState<CompanionTab>('memory')
+  const [companionTipIndex, setCompanionTipIndex] = useState(0)
+  const [companionAction, setCompanionAction] = useState<CompanionAction>('idle')
   const [roleScenarioId, setRoleScenarioId] = useState<string | null>(null)
   const [roleMessages, setRoleMessages] = useState<Message[]>([])
   const [roleDraft, setRoleDraft] = useState('')
@@ -793,6 +810,7 @@ function App() {
   const speechMetricsRef = useRef<SpeechMetrics>(speechMetrics)
   const isSubmittingRef = useRef(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const companionActionTimersRef = useRef<number[]>([])
   const roleDragRef = useRef<RoleDragState | null>(null)
 
   const currentScenario = useMemo(
@@ -819,6 +837,16 @@ function App() {
     () => getStarterPhrases(currentMode.id, currentScenario.id),
     [currentMode.id, currentScenario.id],
   )
+  const companionCards = useMemo(() => {
+    const cards = [
+      ...starterPhrases,
+      currentScenario.sample,
+      feedback.suggestedRewrite,
+      feedback.nextPrompt,
+    ].filter((item) => item && item !== initialFeedback.suggestedRewrite)
+
+    return Array.from(new Set(cards)).slice(0, 6)
+  }, [currentScenario.sample, feedback.nextPrompt, feedback.suggestedRewrite, starterPhrases])
   const draftTargetWords = getTargetWordCount(targetLevel, currentMode.id)
   const draftReadinessItems = createReadinessItems(draft, currentMode.id, draftTargetWords)
   const draftReadinessScore = Math.round(
@@ -827,6 +855,9 @@ function App() {
   const currentSessionTitle = currentMode.id === 'scenario' ? currentScenario.title : currentMode.title
   const canCopySummary = feedback.score > 0 && copyStatus !== 'copied'
   const voiceFlowState = voiceFlowCopy[voiceFlowStatus]
+  const companionCard = companionCards[companionTipIndex % Math.max(companionCards.length, 1)] ?? currentScenario.sample
+  const companionProgress =
+    feedback.score > 0 ? Math.min(100, Math.round((feedback.score + draftReadinessScore) / 2)) : draftReadinessScore
   const canSubmitRole =
     roleDraft.trim().length > 0 && !isRoleSubmitting && !isRoleEnded && activeRoleScenario !== null
 
@@ -858,6 +889,12 @@ function App() {
     checkApi()
 
     return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      companionActionTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
+    }
   }, [])
 
   useEffect(() => {
@@ -1567,6 +1604,43 @@ function App() {
       startedAt: null,
       endedAt: null,
     })
+  }
+
+  function playCompanionAction() {
+    companionActionTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
+    companionActionTimersRef.current = []
+
+    setCompanionAction('wave')
+    companionActionTimersRef.current = [
+      window.setTimeout(() => setCompanionAction('hop'), 260),
+      window.setTimeout(() => setCompanionAction('sparkle'), 520),
+      window.setTimeout(() => setCompanionAction('idle'), 1120),
+    ]
+  }
+
+  function toggleCompanion() {
+    playCompanionAction()
+    setCompanionOpen((currentValue) => !currentValue)
+  }
+
+  function saveCompanionCard() {
+    playCompanionAction()
+    insertStarterPhrase(companionCard)
+    document.getElementById('coach')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function startRecallPractice() {
+    playCompanionAction()
+    const recallPrompt = `I remember this phrase: ${companionCard}. I can use it when...`
+    setDraft(recallPrompt)
+    latestTranscriptRef.current = recallPrompt
+    setSpeechMetrics({
+      inputMethod: 'text',
+      recognitionConfidence: null,
+      startedAt: null,
+      endedAt: null,
+    })
+    document.getElementById('coach')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (
@@ -2369,6 +2443,127 @@ function App() {
           </div>
         </section>
       ) : null}
+
+      <aside
+        className={`study-companion ${companionOpen ? 'open' : 'minimized'} companion-${companionAction}`}
+        aria-label="study companion"
+      >
+        <button
+          className="companion-avatar"
+          aria-label={companionOpen ? '收起学习精灵' : '打开学习精灵'}
+          aria-pressed={companionOpen}
+          onClick={toggleCompanion}
+          title={companionOpen ? '收起学习精灵' : '打开学习精灵'}
+          type="button"
+        >
+          <span className="companion-pulse" />
+          <span className="companion-sparkle one" />
+          <span className="companion-sparkle two" />
+          <span className="companion-sparkle three" />
+          <span className="companion-body">
+            <span className="companion-ear left" />
+            <span className="companion-ear right" />
+            <span className="companion-arm left" />
+            <span className="companion-arm right" />
+            <span className="companion-face">
+              <span className="companion-eye left" />
+              <span className="companion-eye right" />
+              <span className="companion-smile" />
+            </span>
+          </span>
+        </button>
+
+        {companionOpen ? (
+          <section className="companion-panel">
+            <div className="companion-heading">
+              <div>
+                <p>Study Buddy</p>
+                <h3>今天一起记住一句</h3>
+              </div>
+              <span>{companionProgress}%</span>
+            </div>
+
+            <div className="companion-tabs" aria-label="companion mode">
+              {companionTabs.map((tab) => {
+                const TabIcon = tab.icon
+
+                return (
+                  <button
+                    className={companionTab === tab.id ? 'active' : ''}
+                    key={tab.id}
+                    onClick={() => setCompanionTab(tab.id)}
+                    type="button"
+                  >
+                    <TabIcon size={15} />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {companionTab === 'memory' ? (
+              <div className="companion-card memory">
+                <span>Memory Card</span>
+                <strong>{companionCard}</strong>
+                <p>先小声读一遍，再换一个自己的例子说出来。</p>
+                <div>
+                  <button onClick={saveCompanionCard} type="button">
+                    <Sparkles size={15} />
+                    放进输入框
+                  </button>
+                  <button
+                    onClick={() => setCompanionTipIndex((currentIndex) => currentIndex + 1)}
+                    type="button"
+                  >
+                    下一张
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {companionTab === 'review' ? (
+              <div className="companion-card review">
+                <span>Recall Loop</span>
+                <strong>{currentScenario.title} · {targetLevel}</strong>
+                <ul>
+                  <li>
+                    <CheckCircle2 size={14} />
+                    复述刚才的短语，不看原句。
+                  </li>
+                  <li>
+                    <CheckCircle2 size={14} />
+                    加一个 because 或 for example。
+                  </li>
+                  <li>
+                    <CheckCircle2 size={14} />
+                    最后问教练一个追问。
+                  </li>
+                </ul>
+                <button onClick={startRecallPractice} type="button">
+                  开始复述
+                </button>
+              </div>
+            ) : null}
+
+            {companionTab === 'chat' ? (
+              <div className="companion-card chat">
+                <span>Coach Hint</span>
+                <strong>{currentMode.title}</strong>
+                <p>
+                  当前建议：先保证完整句，再补一个细节。你的答案准备度是 {draftReadinessScore}%。
+                </p>
+                <button
+                  onClick={() => document.getElementById('coach')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  type="button"
+                >
+                  <Target size={15} />
+                  回到练习区
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+      </aside>
 
       <footer className="product-footer product-page">
         <span>SpeakPilot</span>

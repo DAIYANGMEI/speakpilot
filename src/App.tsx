@@ -1251,6 +1251,8 @@ function App() {
           learnerText,
           targetLevel,
           goal: scenario.descriptionZh,
+          roleName: scenario.characterName,
+          rolePrompt: scenario.systemPrompt,
           speech: {
             inputMethod: 'text',
             recognitionConfidence: null,

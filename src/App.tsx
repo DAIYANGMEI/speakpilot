@@ -513,6 +513,7 @@ const companionTabs: CompanionTabConfig[] = [
   { id: 'review', icon: Brain, label: '复习' },
   { id: 'chat', icon: MessageSquareText, label: '互动' },
 ]
+
 const preferredVoiceNames = [
   'samantha',
   'jenny',
@@ -858,8 +859,6 @@ function App() {
   const companionCard = companionCards[companionTipIndex % Math.max(companionCards.length, 1)] ?? currentScenario.sample
   const companionProgress =
     feedback.score > 0 ? Math.min(100, Math.round((feedback.score + draftReadinessScore) / 2)) : draftReadinessScore
-  const canSubmitRole =
-    roleDraft.trim().length > 0 && !isRoleSubmitting && !isRoleEnded && activeRoleScenario !== null
 
   useEffect(() => {
     const controller = new AbortController()
@@ -997,6 +996,8 @@ function App() {
   }, [isRoleEnded, isRoleSubmitting, roleMessages.length])
 
   const canSubmit = draft.trim().length > 0 && !isSubmitting
+  const canSubmitRole =
+    roleDraft.trim().length > 0 && !isRoleSubmitting && !isRoleEnded && activeRoleScenario !== null
   const statusLabel =
     apiStatus === 'ready'
       ? runtime?.configured
@@ -1393,17 +1394,6 @@ function App() {
     stopListening(false)
   }
 
-  function selectScenario(scenario: Scenario) {
-    setSelectedScenarioId(scenario.id)
-    setMessages(createInitialMessages(currentMode, scenario))
-    setFeedback(initialFeedback)
-    setCopyStatus('idle')
-    setDraft('')
-    latestTranscriptRef.current = ''
-    cancelCoachVoice()
-    stopListening(false)
-  }
-
   function startRoleDialogDrag(event: ReactPointerEvent<HTMLElement>) {
     if (event.pointerType === 'mouse' && event.button !== 0) {
       return
@@ -1606,6 +1596,23 @@ function App() {
     })
   }
 
+  function loadDraftTemplate(text: string) {
+    const nextDraft = text.trim()
+
+    if (!nextDraft || nextDraft === initialFeedback.suggestedRewrite) {
+      return
+    }
+
+    setDraft(nextDraft)
+    latestTranscriptRef.current = nextDraft
+    setSpeechMetrics({
+      inputMethod: 'text',
+      recognitionConfidence: null,
+      startedAt: null,
+      endedAt: null,
+    })
+  }
+
   function playCompanionAction() {
     companionActionTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
     companionActionTimersRef.current = []
@@ -1654,24 +1661,25 @@ function App() {
           <a href="#product">Product</a>
           <a href="#scenarios">Scenarios</a>
           <a href="#workflow">Workflow</a>
-          <a href="#coach">Practice</a>
+          <a href="#coach">Coach</a>
+          <a href="#feedback">Feedback</a>
         </nav>
-        <a className="nav-cta" href="#coach">Start practice</a>
+        <a className="nav-cta" href="#coach">
+          Start Practice
+        </a>
       </header>
 
       <section className="product-hero product-page" id="product">
         <div className="hero-copy">
-          <p>AI English speaking coach</p>
+          <p>AI Speaking Coach</p>
           <h1>
-            Practice real English before <span>the real moment</span>
+            Your English,
+            <span> under control</span>
           </h1>
-          <strong>
-            SpeakPilot helps learners rehearse realistic conversations, get instant feedback, and turn rough
-            answers into clearer spoken English.
-          </strong>
+          <strong>Practice real conversations, get instant correction, and hear a natural coach reply in one smooth flow.</strong>
           <div className="hero-actions">
-            <a href="#coach">Open workspace</a>
-            <a href="#workflow">See workflow</a>
+            <a href="#coach">Open Coach</a>
+            <a href="#scenarios">Explore Scenes</a>
           </div>
           <div className="hero-stats" aria-label="product highlights">
             <article>
@@ -1683,12 +1691,11 @@ function App() {
               <small>voice feedback</small>
             </article>
             <article>
-              <span>A1-C1</span>
-              <small>level support</small>
+              <span>100</span>
+              <small>score target</small>
             </article>
           </div>
         </div>
-
         <div className="hero-visual" aria-label="speaking coach preview">
           <div className="hero-gradient-card">
             <div className="mock-toolbar">
@@ -1696,20 +1703,17 @@ function App() {
               <span />
               <span />
             </div>
-            <div className="mock-prompt">
-              <p>Coach</p>
-              <strong>Give one complete answer, then ask a natural follow-up question.</strong>
+            <div className="mock-prompt">airport check-in practice</div>
+            <div className="mock-message coach">
+              <span>Coach</span>
+              <p>May I see your passport and booking reference?</p>
             </div>
             <div className="mock-message learner">
               <span>You</span>
-              <p>I would like to explain my project more clearly.</p>
-            </div>
-            <div className="mock-message coach">
-              <span>Feedback</span>
-              <p>Better: I would like to explain the problem, solution, and next step more clearly.</p>
+              <p>I would like to check in and ask for an aisle seat.</p>
             </div>
             <div className="voice-orbit">
-              <Mic size={30} />
+              <Volume2 size={34} />
             </div>
           </div>
         </div>
@@ -1717,11 +1721,9 @@ function App() {
 
       <section className="scenario-showcase product-page" id="scenarios">
         <div className="section-kicker">
-          <p>Scenario practice</p>
-          <h2>Choose the moment you want to rehearse</h2>
-          <strong>Each card starts from a real-life English task, with level, goal, and starter context.</strong>
+          <p>Scenario Library</p>
+          <h2>Jump into the exact conversation you need.</h2>
         </div>
-
         <div className="showcase-grid">
           {scenarios.map((scenario) => (
             <button
@@ -1734,8 +1736,7 @@ function App() {
               <div>
                 <span>{scenario.level}</span>
                 <strong>{scenario.title}</strong>
-                <small>{scenario.titleEn}</small>
-                <p>{scenario.descriptionZh}</p>
+                <p>{scenario.goal}</p>
                 <div className="showcase-character">
                   <RoleAvatar scenario={scenario} size="small" />
                   <span>
@@ -1751,36 +1752,36 @@ function App() {
 
       <section className="workflow-section product-page" id="workflow">
         <div className="workflow-copy">
-          <p>Practice loop</p>
+          <p>Practice Flow</p>
           <h2>
-            One answer becomes a <span>better next answer</span>
+            Speak once,
+            <span> learn immediately.</span>
           </h2>
           <strong>
-            The workspace keeps the learner in a simple loop: choose a mode, speak or type, receive focused
-            feedback, then improve the next turn.
+            The page keeps recognition, model response, voice playback, scoring, correction, and homework in one guided loop.
           </strong>
         </div>
         <div className="workflow-stack">
           <article>
             <span>01</span>
-            <strong>Choose a practice goal</strong>
-            <p>Pick a mode, level, and concrete speaking target.</p>
+            <strong>Choose a mode</strong>
+            <p>Role-play, free talk, grammar clinic, phrase builder, or study plan.</p>
           </article>
           <article>
             <span>02</span>
-            <strong>Answer aloud or by text</strong>
-            <p>Use starter phrases and readiness checks to shape the reply.</p>
+            <strong>Speak or type</strong>
+            <p>Live transcript and answer checks keep each turn focused.</p>
           </article>
           <article>
             <span>03</span>
-            <strong>Review actionable feedback</strong>
-            <p>Improve fluency, grammar, vocabulary, pronunciation, and interaction.</p>
+            <strong>Review feedback</strong>
+            <p>Scores, corrections, useful phrases, and next practice steps appear after each turn.</p>
           </article>
         </div>
       </section>
 
       <section className="app-shell practice-section product-page" id="coach">
-        <section className="topbar" aria-label="app status">
+      <section className="topbar" aria-label="app status">
         <div className="brand-mark">
           <img alt="" src={heroImage} />
           <div>
@@ -1797,9 +1798,22 @@ function App() {
       <section className="practice-layout" aria-label="speaking practice workspace">
         <aside className="control-panel">
           <div className="section-heading">
-            <p>Coach Mode</p>
-            <h1>训练模式</h1>
+            <p>Training Lab</p>
+            <h1>练习工作台</h1>
           </div>
+
+          <section className={`practice-brief ${currentScenario.id}`} aria-label="current scene">
+            <img alt="" src={currentScenario.image} />
+            <div>
+              <span>{currentMode.label} · {targetLevel}</span>
+              <strong>{currentScenario.title}</strong>
+              <p>{currentMode.id === 'scenario' ? currentScenario.descriptionZh : currentMode.goal}</p>
+            </div>
+            <button onClick={() => openRoleDialog(currentScenario)} type="button">
+              <MessageSquareText size={16} />
+              打开角色陪练
+            </button>
+          </section>
 
           <div className="mode-list">
             {modes.map((mode) => {
@@ -1852,19 +1866,56 @@ function App() {
             </div>
           </div>
 
-          <div className="scenario-list compact">
-            {scenarios.map((scenario) => (
+          <section className="focus-board">
+            <div className="mini-heading">
+              <Sparkles size={16} />
+              <span>Focus stack</span>
+            </div>
+            <div className="focus-chip-row">
+              {currentScenario.skills.map((skill) => (
+                <button
+                  key={skill}
+                  onClick={() => setGoal(`Practice ${skill} in ${currentSessionTitle}.`)}
+                  type="button"
+                >
+                  {skill}
+                </button>
+              ))}
+            </div>
+            <div className="template-actions">
+              <button onClick={() => loadDraftTemplate(currentScenario.sample)} type="button">
+                Sample answer
+              </button>
               <button
-                className={`scenario-card ${scenario.id === currentScenario.id ? 'selected' : ''}`}
-                key={scenario.id}
-                onClick={() => selectScenario(scenario)}
+                disabled={feedback.suggestedRewrite === initialFeedback.suggestedRewrite}
+                onClick={() => loadDraftTemplate(feedback.suggestedRewrite)}
                 type="button"
               >
-                <span>{scenario.title}</span>
-                <small>{scenario.level}</small>
+                Better version
               </button>
-            ))}
-          </div>
+              <button onClick={() => loadDraftTemplate(feedback.nextPrompt)} type="button">
+                Next prompt
+              </button>
+            </div>
+          </section>
+
+          <section className="sprint-card">
+            <div className="mini-heading">
+              <CheckCircle2 size={16} />
+              <span>Readiness</span>
+            </div>
+            <strong>{draftReadinessScore}% ready</strong>
+            <div className="readiness-meter" aria-hidden="true">
+              <span style={{ width: `${draftReadinessScore}%` }} />
+            </div>
+            <ul>
+              {draftReadinessItems.map((item) => (
+                <li className={item.complete ? 'complete' : ''} key={`side-${item.label}`}>
+                  {item.label}
+                </li>
+              ))}
+            </ul>
+          </section>
         </aside>
 
         <section className="conversation-panel" aria-labelledby="conversation-title">
@@ -2024,30 +2075,43 @@ function App() {
         </section>
 
         <aside className="feedback-panel" aria-label="feedback">
-          <div className="score-card">
+          <section className="feedback-hero-card">
             <div>
-              <p>Score</p>
+              <p>Live Insight</p>
+              <h3>{currentSessionTitle}</h3>
+              <span>{feedback.focusArea}</span>
+            </div>
+            <div className="hero-score-ring">
               <strong>{feedback.score || '--'}</strong>
+              <span>{feedback.level}</span>
             </div>
-            <span>{feedback.level}</span>
-          </div>
+          </section>
 
-          <div className="provider-card">
-            <Sparkles size={18} />
-            <div>
-              <p>{feedback.provider.source === 'model' ? 'Model Coach' : 'Fallback Coach'}</p>
-              <strong>{feedback.provider.model}</strong>
-              {feedback.provider.error ? <small>{feedback.provider.error}</small> : null}
-            </div>
-          </div>
-
-          <section className="pronunciation-card">
-            <div>
-              <p>Pronunciation</p>
+          <section className="signal-strip" aria-label="coach signals">
+            <article>
+              <span>Voice</span>
               <strong>{feedback.pronunciation.score || '--'}</strong>
-            </div>
-            <span>{feedback.pronunciation.confidence}</span>
-            <small>{feedback.pronunciation.advice}</small>
+              <small>{feedback.pronunciation.confidence}</small>
+            </article>
+            <article>
+              <span>Model</span>
+              <strong>{feedback.provider.source === 'model' ? 'Live' : 'Local'}</strong>
+              <small>{feedback.provider.model}</small>
+            </article>
+            <article>
+              <span>Latency</span>
+              <strong>
+                {feedback.metrics.responseLatencyMs === null
+                  ? '--'
+                  : `${Math.round(feedback.metrics.responseLatencyMs)}ms`}
+              </strong>
+              <small>{feedback.metrics.speakingPace}</small>
+            </article>
+            <article>
+              <span>Turns</span>
+              <strong>{practiceHistory.length}</strong>
+              <small>recent rounds</small>
+            </article>
           </section>
 
           <section className="metrics-grid" aria-label="quantified feedback">
@@ -2064,63 +2128,10 @@ function App() {
               </article>
             ))}
             <article>
-              <span>Latency</span>
-              <strong>
-                {feedback.metrics.responseLatencyMs === null
-                  ? '--'
-                  : `${Math.round(feedback.metrics.responseLatencyMs)}ms`}
-              </strong>
-            </article>
-            <article>
-              <span>Pace</span>
-              <strong>{feedback.metrics.speakingPace}</strong>
-            </article>
-            <article>
               <span>Words</span>
               <strong>{feedback.metrics.wordCount}</strong>
             </article>
           </section>
-
-          <section className="history-box">
-            <div className="history-heading">
-              <h3>Session History</h3>
-              <button
-                disabled={practiceHistory.length === 0}
-                onClick={() => setPracticeHistory([])}
-                type="button"
-              >
-                Clear
-              </button>
-            </div>
-            <div className="history-list">
-              {practiceHistory.length === 0 ? (
-                <p>No practice turns yet.</p>
-              ) : (
-                practiceHistory.map((item) => (
-                  <article key={item.id}>
-                    <div>
-                      <strong>{item.modeTitle}</strong>
-                      <span>{item.time}</span>
-                    </div>
-                    <p>{item.focusArea}</p>
-                    <footer>
-                      <span>Score {item.score}</span>
-                      <span>Pron. {item.pronunciationScore}</span>
-                      <span>{item.provider === 'model' ? 'Model' : 'Fallback'}</span>
-                    </footer>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-
-          <div className="feedback-block focus">
-            <Target size={18} />
-            <div>
-              <p>Focus</p>
-              <strong>{feedback.focusArea}</strong>
-            </div>
-          </div>
 
           <section className="feedback-section">
             <h3>Strengths</h3>
@@ -2189,18 +2200,6 @@ function App() {
             </div>
           </section>
 
-          <section className="plan-box">
-            <h3>Study Plan</h3>
-            <div className="plan-list">
-              {feedback.studyPlan.map((item) => (
-                <article key={`${item.day}-${item.task}`}>
-                  <span>{item.day}</span>
-                  <p>{item.task}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
           <section className="summary-box">
             <div className="summary-heading">
               <h3>Class Summary</h3>
@@ -2230,6 +2229,37 @@ function App() {
           </section>
         </aside>
       </section>
+      </section>
+
+      <section className="feedback-story product-page" id="feedback">
+        <div>
+          <p>Feedback System</p>
+          <h2>
+            A speaking dashboard that feels
+            <span> alive.</span>
+          </h2>
+          <strong>
+            Every turn becomes a compact learning record: pronunciation signal, grammar correction, rewrite, vocabulary, and a follow-up prompt.
+          </strong>
+        </div>
+        <div className="feedback-glass-grid">
+          <article>
+            <span>Fluency</span>
+            <strong>{feedback.metrics.fluency || '--'}</strong>
+          </article>
+          <article>
+            <span>Pronunciation</span>
+            <strong>{feedback.pronunciation.score || '--'}</strong>
+          </article>
+          <article>
+            <span>Grammar</span>
+            <strong>{feedback.metrics.grammar || '--'}</strong>
+          </article>
+          <article>
+            <span>Next prompt</span>
+            <p>{feedback.nextPrompt}</p>
+          </article>
+        </div>
       </section>
 
       {activeRoleScenario ? (
@@ -2565,7 +2595,7 @@ function App() {
         ) : null}
       </aside>
 
-      <footer className="product-footer product-page">
+      <footer className="product-footer">
         <span>SpeakPilot</span>
         <a href="#product">Back to top</a>
       </footer>
